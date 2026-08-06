@@ -1,0 +1,46 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Noto+Serif+JP:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, #root {
+    height: 100%;
+    margin: 0;
+  }
+  body {
+    @apply bg-cream-50 text-navy-900 antialiased;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', 'Yu Gothic UI', 'Meiryo', sans-serif;
+  }
+  .serif {
+    font-family: 'Cormorant Garamond', 'Noto Serif JP', Georgia, serif;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-white rounded-xl border border-navy-100 shadow-sm;
+  }
+  .card-elevated {
+    @apply bg-white rounded-xl shadow-gold border border-gold-200/40;
+  }
+  .btn-primary {
+    @apply bg-navy-700 hover:bg-navy-800 text-white font-medium rounded-md px-4 py-2 transition disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-gold {
+    @apply bg-gradient-to-r from-gold-500 to-gold-400 hover:from-gold-600 hover:to-gold-500 text-navy-900 font-semibold rounded-md px-4 py-2 transition disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-secondary {
+    @apply bg-white hover:bg-cream-100 text-navy-700 font-medium rounded-md px-4 py-2 border border-navy-200 transition;
+  }
+  .badge {
+    @apply inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-sm;
+  }
+  .gold-divider {
+    background: linear-gradient(90deg, transparent, rgba(201, 165, 92, 0.6), transparent);
+    height: 1px;
+  }
+}

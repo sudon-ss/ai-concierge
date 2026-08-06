@@ -1,0 +1,173 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><style>
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Noto+Serif+JP:wght@500;600&family=Noto+Sans+JP:wght@400;500;700;800&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--navy900:#050f1e;--navy800:#0a1a30;--navy700:#0f223b;--navy600:#162e4d;--navy500:#1e3a5f;--navy100:#cbd3e3;
+--gold500:#c9a55c;--gold400:#d4ac4a;--gold300:#dfbe6c;--gold200:#ead498;--gold600:#a98442;--cream50:#fdfcf8}
+body{font-family:'Noto Sans JP',sans-serif;background:#000}
+.serif{font-family:'Cormorant Garamond','Noto Serif JP',serif;letter-spacing:.04em}
+.ic{display:block}.ic.gold{color:var(--gold400)}
+.slide{position:relative;width:1920px;height:1080px;overflow:hidden;color:var(--cream50);padding:50px 64px;display:flex;flex-direction:column;
+background:radial-gradient(1200px 700px at 82% -10%,rgba(201,165,92,.16),transparent 60%),linear-gradient(135deg,#08152a,#050f1e 45%,#020815)}
+.bg-key{position:absolute;right:-120px;bottom:-160px;opacity:.05;transform:rotate(8deg)}
+.frame{position:absolute;inset:26px;border:1px solid rgba(201,165,92,.22);border-radius:10px}
+.s-head{position:relative;z-index:2;display:flex;justify-content:space-between;align-items:flex-start}
+.chip{display:inline-block;font-size:14px;font-weight:700;letter-spacing:.28em;color:var(--gold300);border:1px solid rgba(201,165,92,.45);border-radius:999px;padding:6px 16px;background:rgba(201,165,92,.06)}
+.s-title{font-size:50px;font-weight:600;color:#fff;margin-top:13px;line-height:1.05}
+.s-en{font-size:17px;color:var(--gold200);letter-spacing:.16em;margin-top:6px}
+.brand{display:flex;align-items:center;gap:10px}
+.brand span{font-size:21px;color:var(--gold200);text-transform:uppercase;letter-spacing:.22em;font-weight:600}
+.s-main{position:relative;z-index:2;flex:1;display:flex;gap:50px;margin-top:24px;min-height:0}
+.s-main.col{flex-direction:column;gap:22px}
+
+/* map */
+.map-wrap{flex:0 0 880px;display:grid;grid-template-columns:34px 1fr 34px;grid-template-rows:30px 1fr 30px;align-items:center;justify-items:center;gap:6px}
+.axl{font-size:14px;font-weight:700;color:var(--gold200);letter-spacing:.04em;white-space:nowrap}
+.axl-top{grid-column:2;grid-row:1}.axl-bottom{grid-column:2;grid-row:3}
+.axl-left{grid-column:1;grid-row:2}.axl-right{grid-column:3;grid-row:2}
+.axl-left span,.axl-right span{display:inline-block;transform:rotate(-90deg)}
+.axl-right span{transform:rotate(90deg)}
+.map{grid-column:2;grid-row:2;position:relative;width:812px;height:660px;background:rgba(5,15,30,.4);border:1px solid rgba(201,165,92,.2);border-radius:14px}
+.ws-zone{position:absolute;left:50%;top:0;width:50%;height:50%;border-left:1.5px dashed rgba(201,165,92,.4);border-bottom:1.5px dashed rgba(201,165,92,.4);background:radial-gradient(circle at 75% 25%,rgba(201,165,92,.16),transparent 72%);border-top-right-radius:13px}
+.ws-zone span{position:absolute;right:18px;top:14px;text-align:right;font-size:13px;letter-spacing:.22em;color:var(--gold300);font-weight:700;line-height:1.5}
+.ws-zone b{font-size:17px;letter-spacing:.06em}
+.ax{position:absolute;background:rgba(203,211,227,.25)}
+.ax-v{left:50%;top:0;bottom:0;width:1px}.ax-h{top:50%;left:0;right:0;height:1px}
+.bub{position:absolute;transform:translate(-50%,-50%);display:flex;align-items:center;gap:9px;background:rgba(15,34,59,.82);border:1px solid rgba(203,211,227,.3);border-radius:12px;padding:9px 14px;max-width:215px;box-shadow:0 6px 18px -6px rgba(0,0,0,.5)}
+.bdot{width:9px;height:9px;border-radius:50%;background:var(--navy100);flex-shrink:0}
+.bl{font-size:15px;font-weight:700;color:#fff;line-height:1.2}
+.bs{font-size:11.5px;color:var(--navy100);margin-top:2px}
+.bub.us{background:linear-gradient(135deg,var(--gold500),var(--gold400));border:none;padding:13px 18px;max-width:250px;box-shadow:0 0 0 4px rgba(201,165,92,.25),0 12px 30px -8px rgba(201,165,92,.5);z-index:5}
+.bub.us .bdot{background:var(--navy900)}
+.bub.us .bl{font-size:19px;color:var(--navy900);font-weight:800;font-family:'Cormorant Garamond','Noto Serif JP',serif;letter-spacing:.03em}
+.bub.us .bs{font-size:12.5px;color:#3a2d10;font-weight:600}
+.us-arrow{position:absolute;left:75%;top:18%;height:40%;width:0;border-left:2px dashed rgba(201,165,92,.6);transform:translateX(-50%)}
+
+/* why col */
+.why-col{flex:1;display:flex;flex-direction:column;justify-content:center;gap:15px}
+.why-h{font-size:24px;font-weight:700;color:#fff;margin-bottom:4px}
+.why{display:flex;align-items:center;gap:16px;background:linear-gradient(145deg,rgba(22,46,77,.55),rgba(10,26,48,.35));border:1px solid rgba(201,165,92,.22);border-radius:14px;padding:16px 18px}
+.wic{width:48px;height:48px;border-radius:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 30% 30%,rgba(201,165,92,.25),rgba(201,165,92,.05));color:var(--gold300);border:1px solid rgba(201,165,92,.3)}
+.wt{font-size:19px;font-weight:700;color:#fff}
+.ws2{font-size:14px;color:var(--navy100);margin-top:3px}
+.why-note{display:flex;align-items:center;gap:14px;margin-top:6px;padding:16px 18px;border:1px solid rgba(201,165,92,.4);border-radius:14px;background:rgba(201,165,92,.07)}
+.why-note p{font-size:15px;line-height:1.6;color:var(--gold100)}
+.why-note b{color:#fff}
+
+/* matrix */
+.matrix{flex:1;display:grid;grid-template-columns:120px repeat(4,1fr);grid-auto-rows:1fr;gap:12px}
+.matrix .mh{grid-row:1}
+.mh.phead{display:flex;align-items:center;gap:12px;background:linear-gradient(145deg,rgba(22,46,77,.7),rgba(10,26,48,.45));border:1px solid rgba(201,165,92,.3);border-radius:12px;padding:14px 16px}
+.pic{width:46px;height:46px;border-radius:11px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 30% 30%,rgba(201,165,92,.3),rgba(201,165,92,.06));color:var(--gold300);border:1px solid rgba(201,165,92,.35)}
+.pn{font-size:19px;font-weight:700;color:#fff;line-height:1.2}
+.pt{font-size:13px;color:var(--gold200);margin-top:3px}
+.rl{grid-column:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;border-radius:12px;font-size:15px;font-weight:700;letter-spacing:.06em}
+.rl .ic,.rl svg{opacity:.95}
+.rl-pain{background:rgba(192,57,43,.14);border:1px solid rgba(192,57,43,.4);color:#f0a9a0}
+.rl-solve{background:rgba(201,165,92,.12);border:1px solid rgba(201,165,92,.4);color:var(--gold200)}
+.rl-why{background:rgba(22,46,77,.6);border:1px solid rgba(201,165,92,.3);color:#fff}
+.cell{display:flex;align-items:center;border-radius:12px;padding:16px 18px;font-size:16px;line-height:1.5;font-weight:500}
+.cell.pain{background:rgba(192,57,43,.1);border:1px solid rgba(192,57,43,.28);color:#f4c4bd}
+.cell.solve{background:rgba(255,255,255,.05);border:1px solid rgba(201,165,92,.25);color:#fff}
+.cell.why{background:linear-gradient(145deg,rgba(201,165,92,.16),rgba(201,165,92,.04));border:1px solid rgba(201,165,92,.45);color:var(--gold100);font-weight:600}
+.takeaway{display:flex;align-items:center;gap:16px;padding:18px 24px;border-radius:14px;border:1px solid rgba(201,165,92,.5);background:rgba(201,165,92,.08)}
+.takeaway p{font-size:20px;color:var(--gold100);line-height:1.5}
+.takeaway b{color:#fff}
+</style></head><body>
+<section class="slide" id="s1">
+  <div class="bg-key">
+<svg width="620" height="620" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <defs><linearGradient id="m620" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ead498"/><stop offset="50%" stop-color="#d4ac4a"/><stop offset="100%" stop-color="#a98442"/></linearGradient></defs>
+  <g transform="translate(32 32)">
+    <g transform="rotate(45)" stroke="url(#m620)" stroke-width="2.2" fill="none" stroke-linecap="round"><circle cx="-15" cy="0" r="5"/><circle cx="-15" cy="0" r="1.6" fill="url(#m620)" stroke="none"/><line x1="-10" y1="0" x2="17" y2="0"/><line x1="10" y1="0" x2="10" y2="4"/><line x1="14" y1="0" x2="14" y2="4"/><line x1="17" y1="0" x2="17" y2="3"/></g>
+    <g transform="rotate(-45)" stroke="url(#m620)" stroke-width="2.2" fill="none" stroke-linecap="round"><circle cx="-15" cy="0" r="5"/><circle cx="-15" cy="0" r="1.6" fill="url(#m620)" stroke="none"/><line x1="-10" y1="0" x2="17" y2="0"/><line x1="10" y1="0" x2="10" y2="4"/><line x1="14" y1="0" x2="14" y2="4"/><line x1="17" y1="0" x2="17" y2="3"/></g>
+  </g></svg></div><div class="frame"></div>
+  
+  <header class="s-head">
+    <div><span class="chip">POSITIONING</span><h1 class="serif s-title">誰も取れていない「能動 × 組織」</h1><p class="s-en">Competitive Positioning</p></div>
+    <div class="brand">
+<svg width="26" height="26" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <defs><linearGradient id="m26" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ead498"/><stop offset="50%" stop-color="#d4ac4a"/><stop offset="100%" stop-color="#a98442"/></linearGradient></defs>
+  <g transform="translate(32 32)">
+    <g transform="rotate(45)" stroke="url(#m26)" stroke-width="2.2" fill="none" stroke-linecap="round"><circle cx="-15" cy="0" r="5"/><circle cx="-15" cy="0" r="1.6" fill="url(#m26)" stroke="none"/><line x1="-10" y1="0" x2="17" y2="0"/><line x1="10" y1="0" x2="10" y2="4"/><line x1="14" y1="0" x2="14" y2="4"/><line x1="17" y1="0" x2="17" y2="3"/></g>
+    <g transform="rotate(-45)" stroke="url(#m26)" stroke-width="2.2" fill="none" stroke-linecap="round"><circle cx="-15" cy="0" r="5"/><circle cx="-15" cy="0" r="1.6" fill="url(#m26)" stroke="none"/><line x1="-10" y1="0" x2="17" y2="0"/><line x1="10" y1="0" x2="10" y2="4"/><line x1="14" y1="0" x2="14" y2="4"/><line x1="17" y1="0" x2="17" y2="3"/></g>
+  </g></svg><span class="serif">The Concierge</span></div>
+  </header>
+  <main class="s-main">
+    <div class="map-wrap">
+      <div class="axl axl-top">組織で効く ↑</div>
+      <div class="axl axl-left"><span>← 受動的｜聞けば答える</span></div>
+      <div class="map">
+        <div class="ws-zone"><span>WHITE SPACE<br><b>能動 × 組織</b></span></div>
+        <div class="ax ax-v"></div><div class="ax ax-h"></div>
+        <div class="bub " style="left:18%;top:80%"><span class="bdot"></span><div><p class="bl">ChatGPT / Gemini</p><p class="bs">汎用AI（受動・個人）</p></div></div>
+        <div class="bub " style="left:33%;top:58%"><span class="bdot"></span><div><p class="bl">Google / Outlook</p><p class="bs">素のカレンダー</p></div></div>
+        <div class="bub " style="left:19%;top:22%"><span class="bdot"></span><div><p class="bl">Salesforce 等</p><p class="bs">CRM（記録するだけ）</p></div></div>
+        <div class="bub " style="left:41%;top:14%"><span class="bdot"></span><div><p class="bl">Teams / Slack / Notion</p><p class="bs">グループウェア / PM</p></div></div>
+        <div class="us-arrow"></div>
+        <div class="bub us" style="left:75%;top:44%"><span class="bdot"></span><div><p class="bl">The CONCIERGE</p><p class="bs">個人秘書 → 組織インフラ</p></div></div>
+      </div>
+      <div class="axl axl-right"><span>能動的｜自ら動き、実行する →</span></div>
+      <div class="axl axl-bottom">↓ 個人の道具</div>
+    </div>
+    <div class="why-col">
+      <p class="why-h">なぜ、この空白地帯を取れるのか</p>
+      <div class="why"><div class="wic"><svg class="ic " width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg></div><div><p class="wt">能動配信（Cron / Push）</p><p class="ws2">聞かなくても、朝7時に向こうから動く</p></div></div>
+      <div class="why"><div class="wic"><svg class="ic " width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div><div><p class="wt">承認1タップで実行完結</p><p class="ws2">提案で終わらず、予約・登録・リスケまで</p></div></div>
+      <div class="why"><div class="wic"><svg class="ic " width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3 4 7l4 4"/><path d="M4 7h15"/><path d="m16 21 4-4-4-4"/><path d="M20 17H5"/></svg></div><div><p class="wt">Google ↔ Outlook 横断</p><p class="ws2">汎用AIは自社圏内のみ。取引先混在に強い</p></div></div>
+      <div class="why"><div class="wic"><svg class="ic " width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></div><div><p class="wt">設定不要＝最初から秘書</p><p class="ws2">個人から組織まで、同一基盤で拡張</p></div></div>
+      <div class="why-note">
+<svg width="20" height="20" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <defs><linearGradient id="m20" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ead498"/><stop offset="50%" stop-color="#d4ac4a"/><stop offset="100%" stop-color="#a98442"/></linearGradient></defs>
+  <g transform="translate(32 32)">
+    <g transform="rotate(45)" stroke="url(#m20)" stroke-width="2.2" fill="none" stroke-linecap="round"><circle cx="-15" cy="0" r="5"/><circle cx="-15" cy="0" r="1.6" fill="url(#m20)" stroke="none"/><line x1="-10" y1="0" x2="17" y2="0"/><line x1="10" y1="0" x2="10" y2="4"/><line x1="14" y1="0" x2="14" y2="4"/><line x1="17" y1="0" x2="17" y2="3"/></g>
+    <g transform="rotate(-45)" stroke="url(#m20)" stroke-width="2.2" fill="none" stroke-linecap="round"><circle cx="-15" cy="0" r="5"/><circle cx="-15" cy="0" r="1.6" fill="url(#m20)" stroke="none"/><line x1="-10" y1="0" x2="17" y2="0"/><line x1="10" y1="0" x2="10" y2="4"/><line x1="14" y1="0" x2="14" y2="4"/><line x1="17" y1="0" x2="17" y2="3"/></g>
+  </g></svg><p>汎用AIは「受動・個人」、CRM/PMは「組織だが記録するだけ」。<b>"能動的に実行し、個人から組織まで効く"のはThe CONCIERGEだけ。</b></p></div>
+    </div>
+  </main>
+</section>
+
+<section class="slide" id="s2">
+  <div class="bg-key">
+<svg width="620" height="620" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <defs><linearGradient id="m620" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ead498"/><stop offset="50%" stop-color="#d4ac4a"/><stop offset="100%" stop-color="#a98442"/></linearGradient></defs>
+  <g transform="translate(32 32)">
+    <g transform="rotate(45)" stroke="url(#m620)" stroke-width="2.2" fill="none" stroke-linecap="round"><circle cx="-15" cy="0" r="5"/><circle cx="-15" cy="0" r="1.6" fill="url(#m620)" stroke="none"/><line x1="-10" y1="0" x2="17" y2="0"/><line x1="10" y1="0" x2="10" y2="4"/><line x1="14" y1="0" x2="14" y2="4"/><line x1="17" y1="0" x2="17" y2="3"/></g>
+    <g transform="rotate(-45)" stroke="url(#m620)" stroke-width="2.2" fill="none" stroke-linecap="round"><circle cx="-15" cy="0" r="5"/><circle cx="-15" cy="0" r="1.6" fill="url(#m620)" stroke="none"/><line x1="-10" y1="0" x2="17" y2="0"/><line x1="10" y1="0" x2="10" y2="4"/><line x1="14" y1="0" x2="14" y2="4"/><line x1="17" y1="0" x2="17" y2="3"/></g>
+  </g></svg></div><div class="frame"></div>
+  
+  <header class="s-head">
+    <div><span class="chip">TARGET × PAIN</span><h1 class="serif s-title">誰の、どんな痛みを、なぜ解けるのか</h1><p class="s-en">Who We Win — Pain → Solution → Why</p></div>
+    <div class="brand">
+<svg width="26" height="26" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <defs><linearGradient id="m26" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ead498"/><stop offset="50%" stop-color="#d4ac4a"/><stop offset="100%" stop-color="#a98442"/></linearGradient></defs>
+  <g transform="translate(32 32)">
+    <g transform="rotate(45)" stroke="url(#m26)" stroke-width="2.2" fill="none" stroke-linecap="round"><circle cx="-15" cy="0" r="5"/><circle cx="-15" cy="0" r="1.6" fill="url(#m26)" stroke="none"/><line x1="-10" y1="0" x2="17" y2="0"/><line x1="10" y1="0" x2="10" y2="4"/><line x1="14" y1="0" x2="14" y2="4"/><line x1="17" y1="0" x2="17" y2="3"/></g>
+    <g transform="rotate(-45)" stroke="url(#m26)" stroke-width="2.2" fill="none" stroke-linecap="round"><circle cx="-15" cy="0" r="5"/><circle cx="-15" cy="0" r="1.6" fill="url(#m26)" stroke="none"/><line x1="-10" y1="0" x2="17" y2="0"/><line x1="10" y1="0" x2="10" y2="4"/><line x1="14" y1="0" x2="14" y2="4"/><line x1="17" y1="0" x2="17" y2="3"/></g>
+  </g></svg><span class="serif">The Concierge</span></div>
+  </header>
+  <main class="s-main col">
+    <div class="matrix">
+      <div class="mh corner"></div>
+      <div class="mh phead"><div class="pic"><svg class="ic " width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8l4.5 3.5L12 5l4.5 6.5L21 8l-1.8 11H4.8z"/></svg></div><div><p class="pn">経営層</p><p class="pt">社長・役員</p></div></div><div class="mh phead"><div class="pic"><svg class="ic " width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><div><p class="pn">部長・マネージャー</p><p class="pt">チームを率いる</p></div></div><div class="mh phead"><div class="pic"><svg class="ic " width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 12h18"/></svg></div><div><p class="pn">現場営業（秘書なし）</p><p class="pt">外回り・商談</p></div></div><div class="mh phead"><div class="pic"><svg class="ic " width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></svg></div><div><p class="pn">若手・新人</p><p class="pt">段取りを学ぶ層</p></div></div>
+      <div class="rl rl-pain"><svg class="ic " width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg><span>ペイン</span></div>
+      <div class="cell pain">雑務に時間／秘書の人件費／予定が頭に入らない</div><div class="cell pain">チームの日程調整地獄／誰が動けるか不可視／フォロー漏れ</div><div class="cell pain">移動で遅刻・取りこぼし／アポ調整が面倒／商談の抜け＝失注</div><div class="cell pain">秘書未経験／敬語のアポ調整が苦手／段取りが分からない</div>
+      <div class="rl rl-solve">
+<svg width="18" height="18" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <defs><linearGradient id="m18" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ead498"/><stop offset="50%" stop-color="#d4ac4a"/><stop offset="100%" stop-color="#a98442"/></linearGradient></defs>
+  <g transform="translate(32 32)">
+    <g transform="rotate(45)" stroke="url(#m18)" stroke-width="2.2" fill="none" stroke-linecap="round"><circle cx="-15" cy="0" r="5"/><circle cx="-15" cy="0" r="1.6" fill="url(#m18)" stroke="none"/><line x1="-10" y1="0" x2="17" y2="0"/><line x1="10" y1="0" x2="10" y2="4"/><line x1="14" y1="0" x2="14" y2="4"/><line x1="17" y1="0" x2="17" y2="3"/></g>
+    <g transform="rotate(-45)" stroke="url(#m18)" stroke-width="2.2" fill="none" stroke-linecap="round"><circle cx="-15" cy="0" r="5"/><circle cx="-15" cy="0" r="1.6" fill="url(#m18)" stroke="none"/><line x1="-10" y1="0" x2="17" y2="0"/><line x1="10" y1="0" x2="10" y2="4"/><line x1="14" y1="0" x2="14" y2="4"/><line x1="17" y1="0" x2="17" y2="3"/></g>
+  </g></svg><span>解決</span></div>
+      <div class="cell solve">朝ブリーフィング＋音声で丸投げ。あなたは承認だけ</div><div class="cell solve">Free/Busyで会議を一発設定・稼働ダッシュボード・フォロー漏れ警告</div><div class="cell solve">移動ガード／歩きながら音声登録／商談メモ→次アポ→タスク自動</div><div class="cell solve">敬語の調整文面を自動生成／準備タスク自動／抜け漏れガード</div>
+      <div class="rl rl-why"><svg class="ic " width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span>なぜ解ける</span></div>
+      <div class="cell why">能動配信 × 実行完結 ＝ "人の秘書"を機能で代替（時間単価ROI）</div><div class="cell why">組織レイヤー（集計・調整）＝ 汎用AIには構造的に作れない</div><div class="cell why">実行完結 × 即時入力 ＝ "売上を守る"。ROIで動く層に直撃</div><div class="cell why">対人記憶 × マナー代行 ＝ "できる人に見せる"（代替でなく底上げ）</div>
+    </div>
+    <div class="takeaway">
+<svg width="26" height="26" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <defs><linearGradient id="m26" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ead498"/><stop offset="50%" stop-color="#d4ac4a"/><stop offset="100%" stop-color="#a98442"/></linearGradient></defs>
+  <g transform="translate(32 32)">
+    <g transform="rotate(45)" stroke="url(#m26)" stroke-width="2.2" fill="none" stroke-linecap="round"><circle cx="-15" cy="0" r="5"/><circle cx="-15" cy="0" r="1.6" fill="url(#m26)" stroke="none"/><line x1="-10" y1="0" x2="17" y2="0"/><line x1="10" y1="0" x2="10" y2="4"/><line x1="14" y1="0" x2="14" y2="4"/><line x1="17" y1="0" x2="17" y2="3"/></g>
+    <g transform="rotate(-45)" stroke="url(#m26)" stroke-width="2.2" fill="none" stroke-linecap="round"><circle cx="-15" cy="0" r="5"/><circle cx="-15" cy="0" r="1.6" fill="url(#m26)" stroke="none"/><line x1="-10" y1="0" x2="17" y2="0"/><line x1="10" y1="0" x2="10" y2="4"/><line x1="14" y1="0" x2="14" y2="4"/><line x1="17" y1="0" x2="17" y2="3"/></g>
+  </g></svg><p><b>買い手（経営・部長）に売り、裾野（現場・若手）が"毎日"使う。</b>だから50席は休眠せず、解約されない。</p></div>
+  </main>
+</section></body></html>
