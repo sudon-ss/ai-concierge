@@ -13,7 +13,6 @@ import { SettingsProvider, useSettings } from './hooks/useSettings'
 import { useReminders } from './hooks/useReminders'
 import { useWakeLock } from './hooks/useWakeLock'
 import { FlashOverlay } from './components/FlashOverlay'
-import { consumeAuthCallback } from './lib/api'
 
 function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation()
@@ -28,7 +27,7 @@ function Layout({ children }: { children: React.ReactNode }) {
   )
 }
 
-function AppRoutes() {
+function AppRoutes({ initialConnected }: { initialConnected?: string }) {
   const { settings, onboarded, updateCalendar } = useSettings()
   const location = useLocation()
   const isOnboarding = location.pathname.startsWith('/onboarding')
@@ -36,11 +35,12 @@ function AppRoutes() {
   // リマインダー有効時は、通知を見逃さないよう画面の自動消灯を防ぐ
   useWakeLock(settings.notificationEnabled)
 
-  // Google/Outlook OAuthコールバックからの戻り（?session=...&connected=google）を拾う
+  // OAuthコールバック自体はmain.tsxでReact起動前に同期処理済み（子コンポーネントの
+  // useEffectがセッション未設定のまま先に発火するレースを避けるため）。
+  // ここではデモ用の接続フラグを更新するだけ。
   useEffect(() => {
-    const { connected } = consumeAuthCallback()
-    if (connected === 'google' || connected === 'outlook') {
-      updateCalendar(connected, true)
+    if (initialConnected === 'google' || initialConnected === 'outlook') {
+      updateCalendar(initialConnected, true)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -71,12 +71,12 @@ function AppRoutes() {
   )
 }
 
-export default function App() {
+export default function App({ initialConnected }: { initialConnected?: string }) {
   return (
     <SettingsProvider>
       <ProfileProvider>
         <BrowserRouter>
-          <AppRoutes />
+          <AppRoutes initialConnected={initialConnected} />
         </BrowserRouter>
       </ProfileProvider>
     </SettingsProvider>
