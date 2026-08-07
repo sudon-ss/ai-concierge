@@ -4,6 +4,7 @@ import { MessageBubble } from '../components/MessageBubble'
 import { InputBar } from '../components/InputBar'
 import { FlashOverlay } from '../components/FlashOverlay'
 import { useProfile } from '../hooks/useProfile'
+import { useSettings } from '../hooks/useSettings'
 import type { CalendarEvent, ChatMessage, ExtractedDraft, FreeSlot, MessageContent, Task } from '../types'
 import { getStorageItem, setStorageItem, STORAGE_KEYS } from '../lib/storage'
 import { detectScheduleIntent, extractIntent, type ExtractedIntent } from '../lib/extract'
@@ -165,6 +166,7 @@ const detectIntentKind = (text: string): 'slots' | 'reschedule' | 'schedule' | '
 
 export function ChatPage() {
   const { profileId, profile, events, tasks, addEvent, updateEvent, deleteEvent } = useProfile()
+  const { settings } = useSettings()
   const backendMode = hasBackend() && Boolean(getSession())
 
   const initial = useMemo(
@@ -692,6 +694,8 @@ export function ChatPage() {
             onCancelSlot={onCancelSlot}
             onToggleFlag={onToggleFlag}
             onBlockAll={onBlockAll}
+            googleConnected={settings.calendarConnected.google}
+            outlookConnected={settings.calendarConnected.outlook}
           />
         ))}
       </div>

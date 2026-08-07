@@ -14,6 +14,9 @@ interface Props {
   onCancel: () => void
   /** 全枠を仮押さえするコールバック */
   onBlockAll?: () => void
+  /** 未連携のカレンダーへの登録ボタンを無効化するために使用 */
+  googleConnected?: boolean
+  outlookConnected?: boolean
 }
 
 /** 相手に送れる日程調整文章を生成 */
@@ -40,6 +43,8 @@ export function SlotPicker({
   onConfirm,
   onCancel,
   onBlockAll,
+  googleConnected = true,
+  outlookConnected = true,
 }: Props) {
   const [selected, setSelected] = useState<FreeSlot | null>(null)
   const [location, setLocation] = useState<string>(defaultLocation)
@@ -127,22 +132,40 @@ export function SlotPicker({
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
+                      disabled={!googleConnected}
                       onClick={() => onConfirm(slot, 'google', location.trim())}
-                      className="text-sm font-medium rounded-md bg-navy-700 text-white py-2 hover:bg-navy-800 transition"
+                      className={clsx(
+                        'text-sm font-medium rounded-md py-2 transition',
+                        googleConnected
+                          ? 'bg-navy-700 text-white hover:bg-navy-800'
+                          : 'bg-navy-100 text-navy-300 cursor-not-allowed pointer-events-none',
+                      )}
                     >
                       Googleへ登録
                     </button>
                     <button
                       type="button"
+                      disabled={!outlookConnected}
                       onClick={() => onConfirm(slot, 'outlook', location.trim())}
-                      className="text-sm font-medium rounded-md bg-navy-600 text-white py-2 hover:bg-navy-700 transition"
+                      className={clsx(
+                        'text-sm font-medium rounded-md py-2 transition',
+                        outlookConnected
+                          ? 'bg-navy-600 text-white hover:bg-navy-700'
+                          : 'bg-navy-100 text-navy-300 cursor-not-allowed pointer-events-none',
+                      )}
                     >
                       Outlookへ登録
                     </button>
                     <button
                       type="button"
+                      disabled={!(googleConnected && outlookConnected)}
                       onClick={() => onConfirm(slot, 'both', location.trim())}
-                      className="text-sm font-medium rounded-md bg-gradient-to-r from-gold-500 to-gold-400 text-navy-900 py-2 hover:from-gold-600 hover:to-gold-500 transition col-span-2"
+                      className={clsx(
+                        'text-sm font-medium rounded-md py-2 transition col-span-2',
+                        googleConnected && outlookConnected
+                          ? 'bg-gradient-to-r from-gold-500 to-gold-400 text-navy-900 hover:from-gold-600 hover:to-gold-500'
+                          : 'bg-navy-100 text-navy-300 cursor-not-allowed pointer-events-none',
+                      )}
                     >
                       {isBlocked ? '本確定（他の仮押さえを削除）' : '両方へ登録'}
                     </button>

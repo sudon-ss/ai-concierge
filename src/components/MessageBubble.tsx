@@ -17,12 +17,22 @@ interface Props {
   onCancelSlot?: (id: string) => void
   onToggleFlag?: (eventId: string) => void
   onBlockAll?: (id: string) => void
+  googleConnected?: boolean
+  outlookConnected?: boolean
 }
 
 const fmtTime = (iso: string) =>
   new Date(iso).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
 
-export function MessageBubble({ message, onConfirmSlot, onCancelSlot, onToggleFlag, onBlockAll }: Props) {
+export function MessageBubble({
+  message,
+  onConfirmSlot,
+  onCancelSlot,
+  onToggleFlag,
+  onBlockAll,
+  googleConnected,
+  outlookConnected,
+}: Props) {
   const isUser = message.role === 'user'
 
   return (
@@ -66,6 +76,8 @@ export function MessageBubble({ message, onConfirmSlot, onCancelSlot, onToggleFl
               }
               onCancel={() => onCancelSlot?.(message.id)}
               onBlockAll={() => onBlockAll?.(message.id)}
+              googleConnected={googleConnected}
+              outlookConnected={outlookConnected}
             />
           </div>
         )}
