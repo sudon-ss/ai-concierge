@@ -229,9 +229,10 @@ export interface CreateEventInput {
   memo?: string
 }
 
-/** SlotPickerでユーザーが枠を確定した際に、会話を介さず直接カレンダーへ登録する。 */
-export function confirmEvent(input: CreateEventInput): Promise<ApiEvent> {
-  return apiFetch<ApiEvent>('/api/events', { method: 'POST', body: JSON.stringify(input) })
+/** SlotPickerでユーザーが枠を確定した際に、会話を介さず直接カレンダーへ登録する。
+ *  登録先が複数選択されている場合は、選んだ全カレンダーに同時登録されるため配列で返る。 */
+export function confirmEvent(input: CreateEventInput): Promise<ApiEvent[]> {
+  return apiFetch<ApiEvent[]>('/api/events', { method: 'POST', body: JSON.stringify(input) })
 }
 
 export interface CalendarOption {
@@ -245,8 +246,8 @@ export interface CalendarSelectionState {
   calendars: CalendarOption[]
   /** 空き時間チェック対象のカレンダー（最大3件）。空なら primary/既定カレンダーのみ */
   selectedIds: string[]
-  /** 新規予定の登録先。nullならselectedIdsの先頭 or primary/既定カレンダー */
-  writeId: string | null
+  /** 新規予定の登録先（最大3件）。空なら primary/既定カレンダーのみ */
+  writeIds: string[]
 }
 
 export interface CalendarsResponse {
@@ -261,17 +262,17 @@ export function listCalendars(): Promise<CalendarsResponse> {
   return apiFetch<CalendarsResponse>('/api/calendars')
 }
 
-/** 空き時間チェック対象（最大3件）と新規予定の登録先を設定する */
+/** 空き時間チェック対象（最大3件）と新規予定の登録先（最大3件）を設定する */
 export function selectCalendars(
   provider: 'google' | 'outlook',
   calendarIds: string[],
-  writeCalendarId: string | null,
+  writeCalendarIds: string[],
 ) {
-  return apiFetch<{ ok: boolean; selectedIds: string[]; writeId: string | null }>(
+  return apiFetch<{ ok: boolean; selectedIds: string[]; writeIds: string[] }>(
     `/api/calendars/${provider}/selection`,
     {
       method: 'PUT',
-      body: JSON.stringify({ calendar_ids: calendarIds, write_calendar_id: writeCalendarId }),
+      body: JSON.stringify({ calendar_ids: calendarIds, write_calendar_ids: writeCalendarIds }),
     },
   )
 }

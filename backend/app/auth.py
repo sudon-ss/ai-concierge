@@ -87,14 +87,14 @@ def save_oauth_tokens(
 
 
 def set_calendar_selection(
-    *, user_id: str, provider: str, calendar_ids: list[str] | None, write_calendar_id: str | None
+    *, user_id: str, provider: str, calendar_ids: list[str] | None, write_calendar_ids: list[str] | None
 ) -> None:
-    """1アカウント内に複数カレンダーがある場合の設定（空き時間チェック対象を最大3件、新規登録先を1件）。
-    calendar_ids=Noneはprimary/既定カレンダーのみに戻す。
+    """1アカウント内に複数カレンダーがある場合の設定（参照・登録先ともに最大3件まで選択可能）。
+    calendar_ids=Noneはprimary/既定カレンダーのみを参照、write_calendar_ids=Noneは既定カレンダーへ登録。
     """
     sb = get_supabase()
     sb.table("oauth_tokens").update(
-        {"selected_calendar_ids": calendar_ids, "write_calendar_id": write_calendar_id}
+        {"selected_calendar_ids": calendar_ids, "write_calendar_ids": write_calendar_ids}
     ).eq("user_id", user_id).eq("provider", provider).execute()
 
 

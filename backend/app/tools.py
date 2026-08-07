@@ -1,7 +1,7 @@
 import asyncio
 from datetime import datetime, timedelta
 
-from .calendar_service import get_adapter, get_connected_adapters
+from .calendar_service import get_adapter, get_connected_adapters, get_write_adapters
 from .database import get_supabase
 
 IMPORTANT_KEYWORDS = ["持っていく", "準備", "印刷", "届ける", "提出", "用意", "締め切り", "締切"]
@@ -83,31 +83,35 @@ async def create_event(
     end: str,
     location: str | None = None,
     memo: str | None = None,
-) -> dict:
-    adapter = await get_adapter(user_id, calendar)
-    if not adapter:
+) -> list[dict]:
+    """登録先として選択されている全カレンダー（最大3件）に同時登録する。"""
+    adapters = await get_write_adapters(user_id, calendar)
+    if not adapters:
         raise ValueError(f"{calendar} が連携されていません")
 
-    ev = await adapter.create_event(
-        title=title, start=datetime.fromisoformat(start), end=datetime.fromisoformat(end), location=location
-    )
     judged = judge_memo_importance(memo) if memo else {"priority": "normal", "flagged": False}
-
-    get_supabase().table("events").insert(
-        {
-            "user_id": user_id,
-            "calendar": calendar,
-            "ext_id": ev["id"],
-            "title": ev["title"],
-            "start_at": ev["start"],
-            "end_at": ev["end"],
-            "location": ev.get("location"),
-            "memo": memo,
-            "memo_priority": judged["priority"],
-            "memo_flagged": judged["flagged"],
-        }
-    ).execute()
-    return ev
+    sb = get_supabase()
+    results = []
+    for adapter in adapters:
+        ev = await adapter.create_event(
+            title=title, start=datetime.fromisoformat(start), end=datetime.fromisoformat(end), location=location
+        )
+        sb.table("events").insert(
+            {
+                "user_id": user_id,
+                "calendar": calendar,
+                "ext_id": ev["id"],
+                "title": ev["title"],
+                "start_at": ev["start"],
+                "end_at": ev["end"],
+                "location": ev.get("location"),
+                "memo": memo,
+                "memo_priority": judged["priority"],
+                "memo_flagged": judged["flagged"],
+            }
+        ).execute()
+        results.append(ev)
+    return results
 
 
 async def create_task(

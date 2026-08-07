@@ -43,7 +43,7 @@ async def create_event_endpoint(body: CreateEventRequest, user: SessionUser = De
     ボタン操作からの意図をチャットの文脈解釈に頼らず確実に反映する。
     """
     try:
-        ev = await create_event(
+        events = await create_event(
             user.user_id,
             calendar=body.calendar,
             title=body.title,
@@ -54,4 +54,4 @@ async def create_event_endpoint(body: CreateEventRequest, user: SessionUser = De
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return ev
+    return events

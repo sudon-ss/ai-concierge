@@ -35,15 +35,41 @@ async def _get_valid_token_row(user_id: str, provider: str) -> dict | None:
 
 
 async def get_adapter(user_id: str, provider: str) -> CalendarAdapter | None:
+    """読み取り用（get_free_slots等）、または単一の書き込み先（reschedule_event等）向け。
+    書き込み先が複数選択されている場合は先頭のものを使う。複数カレンダーへの同時登録には
+    get_write_adapters() を使うこと。
+    """
     row = await _get_valid_token_row(user_id, provider)
     if not row:
         return None
 
     read_ids = row.get("selected_calendar_ids") or None
-    write_id = row.get("write_calendar_id")
+    write_ids = row.get("write_calendar_ids") or []
+    write_id = write_ids[0] if write_ids else None
     if provider == "google":
         return GoogleCalendarAdapter(row["access_token"], read_ids, write_id)
     return OutlookCalendarAdapter(row["access_token"], read_ids, write_id)
+
+
+async def get_write_adapters(user_id: str, provider: str) -> list[CalendarAdapter]:
+    """新規予定の登録先として選ばれている全カレンダー分のアダプターを返す（§10-4後続: 複数登録先対応）。
+    未選択の場合はprimary/既定カレンダー1件分を返す。
+    """
+    row = await _get_valid_token_row(user_id, provider)
+    if not row:
+        return []
+
+    write_ids: list[str | None] = list(row.get("write_calendar_ids") or [])
+    if not write_ids:
+        write_ids = [None]
+
+    adapters = []
+    for wid in write_ids:
+        if provider == "google":
+            adapters.append(GoogleCalendarAdapter(row["access_token"], None, wid))
+        else:
+            adapters.append(OutlookCalendarAdapter(row["access_token"], None, wid))
+    return adapters
 
 
 async def get_connected_adapters(user_id: str) -> dict[str, CalendarAdapter]:

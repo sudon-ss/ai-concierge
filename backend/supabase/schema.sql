@@ -30,8 +30,8 @@ create table oauth_tokens (
   expires_at bigint not null,
   -- 1アカウント内に複数カレンダーがある場合の設定（最大3件まで空き時間チェック対象にできる）
   selected_calendar_ids text[],
-  -- 新規予定の登録先。NULLならselected_calendar_idsの先頭 or primary/既定カレンダー
-  write_calendar_id text,
+  -- 新規予定の登録先（最大3件まで、選んだ全カレンダーに同時登録する）。空/NULLならprimary/既定カレンダー
+  write_calendar_ids text[],
   updated_at timestamptz default now(),
   primary key (user_id, provider)
 );

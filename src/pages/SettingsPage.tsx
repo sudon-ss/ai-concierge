@@ -31,11 +31,14 @@ function CalendarSelector({
   // 未選択（参照対象を明示していない）時は既定カレンダーのみ選択中として表示
   const readIds =
     state.selectedIds.length > 0 ? state.selectedIds : state.calendars.filter((c) => c.primary).map((c) => c.id)
-  const writeId = state.writeId ?? state.calendars.find((c) => c.primary)?.id ?? readIds[0] ?? null
+  const writeIds =
+    state.writeIds.length > 0
+      ? state.writeIds
+      : [state.calendars.find((c) => c.primary)?.id ?? readIds[0]].filter((id): id is string => Boolean(id))
 
-  const save = (next: { readIds: string[]; writeId: string | null }) => {
+  const save = (next: { readIds: string[]; writeIds: string[] }) => {
     setSaving(true)
-    selectCalendars(provider, next.readIds, next.writeId)
+    selectCalendars(provider, next.readIds, next.writeIds)
       .then(onChanged)
       .finally(() => setSaving(false))
   }
@@ -45,25 +48,28 @@ function CalendarSelector({
     if (isChecked && readIds.length === 1) return // 参照ゼロは不可（最低1件）
     const next = isChecked ? readIds.filter((c) => c !== id) : [...readIds, id]
     if (!isChecked && next.length > MAX_SELECTED_CALENDARS) return
-    save({ readIds: next, writeId })
+    save({ readIds: next, writeIds })
   }
 
   const toggleWrite = (id: string) => {
-    // 登録先はON/OFFのトグル。OFFにすると明示指定を解除（既定カレンダーにフォールバック）
-    const next = writeId === id ? null : id
-    save({ readIds, writeId: next })
+    const isChecked = writeIds.includes(id)
+    if (isChecked && writeIds.length === 1) return // 登録先ゼロは不可（最低1件）
+    const next = isChecked ? writeIds.filter((c) => c !== id) : [...writeIds, id]
+    if (!isChecked && next.length > MAX_SELECTED_CALENDARS) return
+    save({ readIds, writeIds: next })
   }
 
   return (
     <div className="pb-3 -mt-1 pl-0 space-y-1.5">
       <p className="text-xs text-navy-500">
-        参照（空き時間チェック・最大{MAX_SELECTED_CALENDARS}件）と登録先を個別に選べます
+        参照（空き時間チェック）・登録先（新規予定の登録先）とも最大{MAX_SELECTED_CALENDARS}件まで選べます
       </p>
       <div className="space-y-1">
         {state.calendars.map((c) => {
           const checked = readIds.includes(c.id)
-          const isWrite = writeId === c.id
+          const isWrite = writeIds.includes(c.id)
           const readDisabled = saving || (!checked && readIds.length >= MAX_SELECTED_CALENDARS)
+          const writeDisabled = saving || (!isWrite && writeIds.length >= MAX_SELECTED_CALENDARS)
           return (
             <div
               key={c.id}
@@ -90,7 +96,7 @@ function CalendarSelector({
               <span className="text-navy-800 flex-1 truncate">{c.name}</span>
               <button
                 type="button"
-                disabled={saving}
+                disabled={writeDisabled}
                 onClick={() => toggleWrite(c.id)}
                 className={clsx(
                   'shrink-0 text-[11px] font-semibold rounded-full px-2.5 py-1 transition disabled:opacity-40',

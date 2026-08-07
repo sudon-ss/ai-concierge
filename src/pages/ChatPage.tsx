@@ -270,21 +270,17 @@ export function ChatPage() {
     }
 
     const createdEvent = res.tool_events.find(
-      (e) =>
-        e.name === 'create_event' &&
-        e.result &&
-        typeof e.result === 'object' &&
-        !('error' in (e.result as object)),
+      (e) => e.name === 'create_event' && Array.isArray(e.result) && e.result.length > 0,
     )
     if (createdEvent) {
-      const result = createdEvent.result as {
+      const [result] = createdEvent.result as {
         id: string
         title: string
         start: string
         end: string
         location?: string
         source: 'google' | 'outlook'
-      }
+      }[]
       return {
         type: 'approval',
         selectedSlot: { start: result.start, end: result.end, label: '' },
@@ -482,9 +478,12 @@ export function ChatPage() {
           confirmEvent({ calendar: cal, title, start: slot.start, end: slot.end, location: location || undefined }),
         ),
       ).then((results) => {
-        const succeeded = results.filter(
-          (r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof confirmEvent>>> => r.status === 'fulfilled',
-        )
+        // 各プロバイダの登録が複数カレンダー同時登録（配列）で返るため、まとめて1段フラット化する
+        const succeeded = results
+          .filter(
+            (r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof confirmEvent>>> => r.status === 'fulfilled',
+          )
+          .flatMap((r) => r.value)
         const failedCalendars = targets.filter((_, i) => results[i].status === 'rejected')
 
         if (succeeded.length === 0) {
@@ -504,7 +503,7 @@ export function ChatPage() {
           return
         }
 
-        const primary = succeeded[0].value
+        const primary = succeeded[0]
         const note =
           failedCalendars.length > 0
             ? `（${failedCalendars.map((c) => (c === 'google' ? 'Google' : 'Outlook')).join('・')}への登録には失敗しております。連携状況をご確認くださいませ）`
