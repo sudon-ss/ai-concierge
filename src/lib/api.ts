@@ -206,9 +206,15 @@ export interface ApiEvent {
   start: string
   end: string
   location?: string
-  source: 'google' | 'outlook'
+  /** 一覧取得時は重複統合されるため、Google/Outlook 双方にある予定は 'both' になる */
+  source: 'google' | 'outlook' | 'both'
   /** 削除時にどのカレンダーへ問い合わせるかの判別用（仮押さえの解除で使う） */
   calendar_id?: string | null
+}
+
+/** 作成直後の予定。単一カレンダーへの登録結果なので source は必ず片方に定まる */
+export interface CreatedEvent extends Omit<ApiEvent, 'source'> {
+  source: 'google' | 'outlook'
 }
 
 export interface BriefingResponse {
@@ -236,8 +242,8 @@ export interface CreateEventInput {
 
 /** SlotPickerでユーザーが枠を確定した際に、会話を介さず直接カレンダーへ登録する。
  *  登録先が複数選択されている場合は、選んだ全カレンダーに同時登録されるため配列で返る。 */
-export function confirmEvent(input: CreateEventInput): Promise<ApiEvent[]> {
-  return apiFetch<ApiEvent[]>('/api/events', { method: 'POST', body: JSON.stringify(input) })
+export function confirmEvent(input: CreateEventInput): Promise<CreatedEvent[]> {
+  return apiFetch<CreatedEvent[]>('/api/events', { method: 'POST', body: JSON.stringify(input) })
 }
 
 /** 仮押さえした枠を後から削除するために必要な最小情報 */
@@ -247,7 +253,7 @@ export interface TentativeRef {
   calendar_id?: string | null
 }
 
-export const toTentativeRef = (ev: ApiEvent): TentativeRef => ({
+export const toTentativeRef = (ev: CreatedEvent): TentativeRef => ({
   calendar: ev.source,
   event_id: ev.id,
   calendar_id: ev.calendar_id ?? null,
@@ -258,8 +264,8 @@ export function holdTentativeSlots(input: {
   calendar: 'google' | 'outlook'
   title: string
   slots: { start: string; end: string }[]
-}): Promise<ApiEvent[]> {
-  return apiFetch<ApiEvent[]>('/api/events/tentative', {
+}): Promise<CreatedEvent[]> {
+  return apiFetch<CreatedEvent[]>('/api/events/tentative', {
     method: 'POST',
     body: JSON.stringify(input),
   })

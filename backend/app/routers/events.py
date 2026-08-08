@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, field_validator
 
-from ..calendar_service import get_connected_adapters
+from ..calendar_service import dedupe_events, get_connected_adapters
 from ..dependencies import get_current_user
 from ..models import CalendarSource, SessionUser
 from ..tools import create_event, hold_tentative_slots, release_tentative_slots
@@ -24,7 +24,7 @@ async def list_events_endpoint(days: int = 30, user: SessionUser = Depends(get_c
 
     adapters = await get_connected_adapters(user.user_id)
     events_lists = await asyncio.gather(*[a.list_events(now, time_max) for a in adapters.values()])
-    events = [ev for lst in events_lists for ev in lst]
+    events = dedupe_events([ev for lst in events_lists for ev in lst])
     events.sort(key=lambda e: e["start"] or "")
     return events
 

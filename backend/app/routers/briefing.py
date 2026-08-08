@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends
 
-from ..calendar_service import get_connected_adapters
+from ..calendar_service import dedupe_events, get_connected_adapters
 from ..database import get_supabase
 from ..dependencies import get_current_user
 from ..models import SessionUser
@@ -18,7 +18,7 @@ async def get_briefing(user: SessionUser = Depends(get_current_user)):
 
     adapters = await get_connected_adapters(user.user_id)
     events_lists = await asyncio.gather(*[a.list_events(now, time_max) for a in adapters.values()])
-    events = [ev for lst in events_lists for ev in lst]
+    events = dedupe_events([ev for lst in events_lists for ev in lst])
     events.sort(key=lambda e: e["start"] or "")
 
     sb = get_supabase()
