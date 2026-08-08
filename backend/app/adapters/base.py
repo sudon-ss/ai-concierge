@@ -17,9 +17,17 @@ class CalendarAdapter(ABC):
 
     @abstractmethod
     async def update_event(
-        self, event_id: str, *, start: datetime | None = None, end: datetime | None = None
+        self,
+        event_id: str,
+        *,
+        start: datetime | None = None,
+        end: datetime | None = None,
+        calendar_id: str | None = None,
     ) -> dict:
-        """更新後のイベントを共通フォーマットで返す。"""
+        """更新後のイベントを共通フォーマットで返す。
+        calendar_id を渡すと書き込み先ではなくそのカレンダー上の予定を更新する
+        （同じ予定を複数カレンダーに登録している場合、各コピーを動かすために必要）。
+        """
 
     @abstractmethod
     async def delete_event(self, event_id: str, *, calendar_id: str | None = None) -> None:

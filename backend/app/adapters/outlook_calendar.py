@@ -109,16 +109,23 @@ class OutlookCalendarAdapter(CalendarAdapter):
         return _to_common(resp.json(), self._write_id)
 
     async def update_event(
-        self, event_id: str, *, start: datetime | None = None, end: datetime | None = None
+        self,
+        event_id: str,
+        *,
+        start: datetime | None = None,
+        end: datetime | None = None,
+        calendar_id: str | None = None,
     ) -> dict:
         body = {}
         if start:
             body["start"] = {"dateTime": start.isoformat(), "timeZone": "Asia/Tokyo"}
         if end:
             body["end"] = {"dateTime": end.isoformat(), "timeZone": "Asia/Tokyo"}
-        resp = await self._client.patch(f"{self._write_path}/events/{event_id}", json=body)
+        # Graphはイベントidが全カレンダー横断で一意なため /me/events/{id} で更新できる
+        path = "/me" if calendar_id else self._write_path
+        resp = await self._client.patch(f"{path}/events/{event_id}", json=body)
         resp.raise_for_status()
-        return _to_common(resp.json(), self._write_id)
+        return _to_common(resp.json(), calendar_id or self._write_id)
 
     async def delete_event(self, event_id: str, *, calendar_id: str | None = None) -> None:
         # Graphはイベントidが全カレンダー横断で一意なため /me/events/{id} で消せる

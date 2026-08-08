@@ -72,19 +72,27 @@ async def get_write_adapters(user_id: str, provider: str) -> list[CalendarAdapte
     return adapters
 
 
+def _copy_ref(ev: dict) -> dict:
+    return {"id": ev["id"], "calendar_id": ev.get("calendar_id"), "source": ev.get("source")}
+
+
 def dedupe_events(events: list[dict]) -> list[dict]:
     """同一の予定が複数カレンダーに登録されている場合、表示上1件にまとめる。
     登録先を複数選んでいると同じ予定がその数だけ返るため、予定一覧・ブリーフィング・
     リマインダーで同じ予定が何度も現れてしまう。件名・開始・終了が一致するものを
     同一の予定とみなす。Google と Outlook の両方にある場合は source を "both" にする。
+
+    まとめた元の予定は copies に残す。予定を変更する際、まとめて表示している
+    3件を1回の指示で同時に動かすために必要になる。
     """
     merged: dict[tuple, dict] = {}
     for ev in events:
         key = (ev.get("title"), ev.get("start"), ev.get("end"))
         existing = merged.get(key)
         if existing is None:
-            merged[key] = dict(ev)
+            merged[key] = {**ev, "copies": [_copy_ref(ev)]}
             continue
+        existing["copies"].append(_copy_ref(ev))
         if existing.get("source") != ev.get("source"):
             existing["source"] = "both"
         # 片方にしか場所が入っていないケースを拾う

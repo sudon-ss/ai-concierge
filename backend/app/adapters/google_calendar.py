@@ -109,16 +109,22 @@ class GoogleCalendarAdapter(CalendarAdapter):
         return _to_common(resp.json(), self._write_id)
 
     async def update_event(
-        self, event_id: str, *, start: datetime | None = None, end: datetime | None = None
+        self,
+        event_id: str,
+        *,
+        start: datetime | None = None,
+        end: datetime | None = None,
+        calendar_id: str | None = None,
     ) -> dict:
         body = {}
         if start:
             body["start"] = {"dateTime": start.isoformat()}
         if end:
             body["end"] = {"dateTime": end.isoformat()}
-        resp = await self._client.patch(f"/calendars/{self._write_path}/events/{event_id}", json=body)
+        path = quote(calendar_id, safe="") if calendar_id else self._write_path
+        resp = await self._client.patch(f"/calendars/{path}/events/{event_id}", json=body)
         resp.raise_for_status()
-        return _to_common(resp.json(), self._write_id)
+        return _to_common(resp.json(), calendar_id or self._write_id)
 
     async def delete_event(self, event_id: str, *, calendar_id: str | None = None) -> None:
         path = quote(calendar_id, safe="") if calendar_id else self._write_path

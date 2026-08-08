@@ -1,7 +1,7 @@
 import asyncio
 from datetime import datetime, timedelta
 
-from .calendar_service import get_adapter, get_connected_adapters, get_write_adapters
+from .calendar_service import dedupe_events, get_adapter, get_connected_adapters, get_write_adapters
 from .database import get_supabase
 
 IMPORTANT_KEYWORDS = ["持っていく", "準備", "印刷", "届ける", "提出", "用意", "締め切り", "締切"]
@@ -184,18 +184,91 @@ async def create_task(
     return res.data[0]
 
 
-async def reschedule_event(user_id: str, *, calendar: str, event_id: str, new_start: str, new_end: str) -> dict:
-    adapter = await get_adapter(user_id, calendar)
-    if not adapter:
-        raise ValueError(f"{calendar} が連携されていません")
+RESCHEDULE_SEARCH_DAYS = 120
 
-    ev = await adapter.update_event(
-        event_id, start=datetime.fromisoformat(new_start), end=datetime.fromisoformat(new_end)
+
+async def _load_events(user_id: str, time_min: datetime, time_max: datetime) -> list[dict]:
+    """連携済みの全カレンダーから予定を取得し、重複を1件にまとめて返す。"""
+    adapters = await get_connected_adapters(user_id)
+    if not adapters:
+        return []
+    results = await asyncio.gather(*[a.list_events(time_min, time_max) for a in adapters.values()])
+    events = dedupe_events([ev for lst in results for ev in lst])
+    events.sort(key=lambda e: e["start"] or "")
+    return events
+
+
+async def find_events(user_id: str, date_from: str, date_to: str) -> dict:
+    """既存の予定を検索する。予定の変更にはevent_idが必要なため、
+    reschedule_eventを呼ぶ前にこのツールで対象を特定する。
+    """
+    events = await _load_events(user_id, datetime.fromisoformat(date_from), datetime.fromisoformat(date_to))
+    if not events:
+        return {"events": [], "note": f"{date_from}から{date_to}の間に予定はありません"}
+    # copiesは内部管理用（同時変更のため）なのでClaudeには渡さず、件数だけ伝える
+    return {
+        "events": [
+            {
+                "event_id": e["id"],
+                "calendar": e["source"],
+                "title": e["title"],
+                "start": e["start"],
+                "end": e["end"],
+                "location": e.get("location"),
+                "registered_calendars": len(e.get("copies", [])),
+            }
+            for e in events
+        ]
+    }
+
+
+async def reschedule_event(
+    user_id: str, *, calendar: str, event_id: str, new_start: str, new_end: str
+) -> dict:
+    """予定の時刻を変更する。同じ予定を複数カレンダーに登録している場合は、
+    その全コピーを同時に動かす（片方だけ動いて食い違うのを防ぐ）。
+    """
+    now = datetime.now().astimezone()
+    events = await _load_events(
+        user_id, now - timedelta(days=1), now + timedelta(days=RESCHEDULE_SEARCH_DAYS)
     )
-    get_supabase().table("events").update({"start_at": ev["start"], "end_at": ev["end"]}).eq(
+    target = next(
+        (e for e in events if e["id"] == event_id or any(c["id"] == event_id for c in e.get("copies", []))),
+        None,
+    )
+    if target is None:
+        raise ValueError("変更対象の予定が見つかりませんでした。find_eventsで予定を確認してください")
+
+    start = datetime.fromisoformat(new_start)
+    end = datetime.fromisoformat(new_end)
+    copies = target.get("copies") or [{"id": event_id, "calendar_id": None, "source": calendar}]
+
+    adapters: dict[str, object] = {}
+    for provider in {c["source"] for c in copies}:
+        adapter = await get_adapter(user_id, provider)
+        if adapter:
+            adapters[provider] = adapter
+
+    async def move_one(copy: dict) -> dict | None:
+        adapter = adapters.get(copy["source"])
+        if not adapter:
+            return None
+        try:
+            return await adapter.update_event(
+                copy["id"], start=start, end=end, calendar_id=copy.get("calendar_id")
+            )
+        except Exception:
+            return None
+
+    moved = [ev for ev in await asyncio.gather(*[move_one(c) for c in copies]) if ev]
+    if not moved:
+        raise ValueError("予定の変更に失敗しました")
+
+    get_supabase().table("events").update({"start_at": moved[0]["start"], "end_at": moved[0]["end"]}).eq(
         "user_id", user_id
-    ).eq("ext_id", event_id).execute()
-    return ev
+    ).in_("ext_id", [c["id"] for c in copies]).execute()
+
+    return {**moved[0], "updated_calendars": len(moved), "total_calendars": len(copies)}
 
 
 TOOLS = [
@@ -228,13 +301,32 @@ TOOLS = [
         },
     },
     {
+        "name": "find_events",
+        "description": (
+            "既存の予定を検索して event_id を調べる。"
+            "予定の変更・確認を依頼された場合は、まずこのツールで対象の予定を特定すること。"
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "date_from": {"type": "string", "description": "検索開始日時 ISO8601"},
+                "date_to": {"type": "string", "description": "検索終了日時 ISO8601"},
+            },
+            "required": ["date_from", "date_to"],
+        },
+    },
+    {
         "name": "reschedule_event",
-        "description": "既存の予定の時刻を変更する。ユーザーが明示的に承認した後にのみ呼び出すこと。",
+        "description": (
+            "既存の予定の時刻を変更する。event_id は find_events で取得したものを使うこと。"
+            "同じ予定が複数のカレンダーに登録されている場合は自動的に全て同時に変更される。"
+            "ユーザーが明示的に承認した後にのみ呼び出すこと。"
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "calendar": {"type": "string", "enum": ["google", "outlook"]},
-                "event_id": {"type": "string"},
+                "event_id": {"type": "string", "description": "find_eventsで取得したevent_id"},
                 "new_start": {"type": "string", "description": "ISO8601"},
                 "new_end": {"type": "string", "description": "ISO8601"},
             },
@@ -275,6 +367,8 @@ async def run_tool(name: str, user_id: str, tool_input: dict) -> dict:
         return await get_free_slots(user_id, tool_input["date_from"], tool_input["date_to"])
     if name == "create_event":
         return await create_event(user_id, **tool_input)
+    if name == "find_events":
+        return await find_events(user_id, tool_input["date_from"], tool_input["date_to"])
     if name == "reschedule_event":
         return await reschedule_event(user_id, **tool_input)
     if name == "create_task":
