@@ -68,12 +68,15 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>
 }
 
-export function googleLoginUrl(): string {
-  return `${API_BASE}/api/auth/google/login`
+/** redirectTo='onboarding' を渡すと、認証後にオンボーディングのカレンダーステップへ戻る */
+export function googleLoginUrl(redirectTo?: 'onboarding'): string {
+  const qs = redirectTo ? `?state=${redirectTo}` : ''
+  return `${API_BASE}/api/auth/google/login${qs}`
 }
 
-export function outlookLoginUrl(): string {
-  return `${API_BASE}/api/auth/outlook/login`
+export function outlookLoginUrl(redirectTo?: 'onboarding'): string {
+  const qs = redirectTo ? `?state=${redirectTo}` : ''
+  return `${API_BASE}/api/auth/outlook/login${qs}`
 }
 
 export interface ChatApiResponse {

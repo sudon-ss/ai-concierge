@@ -57,7 +57,7 @@ function AppRoutes({ initialConnected }: { initialConnected?: string }) {
   return (
     <Layout>
       <Routes>
-        <Route path="/onboarding" element={<OnboardingPage />} />
+        <Route path="/onboarding" element={<OnboardingPage initialConnected={initialConnected} />} />
         <Route path="/" element={<HomePage />} />
         <Route path="/chat" element={<ChatPage />} />
         <Route path="/calendar" element={<CalendarPage />} />

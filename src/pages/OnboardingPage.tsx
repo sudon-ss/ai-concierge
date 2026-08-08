@@ -4,19 +4,29 @@ import { Check, ChevronLeft, ChevronRight, Bell, Calendar, Clock } from 'lucide-
 import clsx from 'clsx'
 import { useProfile } from '../hooks/useProfile'
 import { useSettings, BRIEFING_TIME_OPTIONS, formatBriefingTime } from '../hooks/useSettings'
+import { useCalendarsData } from '../hooks/useCalendarsData'
 import { PROFILES, type ProfileId } from '../types/profile'
 import { Wordmark } from '../components/Wordmark'
 import { ConciergeMark } from '../components/ConciergeMark'
+import { CalendarSelector } from '../components/CalendarSelector'
+import { googleLoginUrl, outlookLoginUrl, type CalendarsResponse } from '../lib/api'
 
 type StepId = 'welcome' | 'profile' | 'calendar' | 'notification' | 'done'
 const STEPS: StepId[] = ['welcome', 'profile', 'calendar', 'notification', 'done']
 
-export function OnboardingPage() {
+export function OnboardingPage({ initialConnected }: { initialConnected?: string }) {
   const navigate = useNavigate()
   const { profileId, setProfileId } = useProfile()
   const { settings, updateSettings, updateCalendar, setOnboarded } = useSettings()
+  const { backendConnected, calendarsData, refreshCalendars } = useCalendarsData(
+    settings.calendarConnected.google,
+    settings.calendarConnected.outlook,
+  )
 
-  const [stepIndex, setStepIndex] = useState(0)
+  // Google/Outlook連携から戻ってきた場合（初回マウント時のみ判定）はカレンダーステップへ直接戻る
+  const [stepIndex, setStepIndex] = useState(() =>
+    initialConnected === 'google' || initialConnected === 'outlook' ? STEPS.indexOf('calendar') : 0,
+  )
   const step = STEPS[stepIndex]
 
   const next = () => setStepIndex((i) => Math.min(i + 1, STEPS.length - 1))
@@ -35,6 +45,16 @@ export function OnboardingPage() {
   const skip = () => {
     setOnboarded(true)
     navigate('/', { replace: true })
+  }
+
+  const handleConnectCalendar = (provider: 'google' | 'outlook') => {
+    if (!backendConnected) {
+      // バックエンド未設定（VITE_API_BASE_URL未設定）時はデモ用のローカルトグルのまま
+      updateCalendar(provider, true)
+      return
+    }
+    window.location.href =
+      provider === 'google' ? googleLoginUrl('onboarding') : outlookLoginUrl('onboarding')
   }
 
   return (
@@ -74,7 +94,10 @@ export function OnboardingPage() {
             <CalendarStep
               google={settings.calendarConnected.google}
               outlook={settings.calendarConnected.outlook}
-              onToggle={updateCalendar}
+              backendConnected={backendConnected}
+              calendarsData={calendarsData}
+              onConnect={handleConnectCalendar}
+              onRefreshCalendars={refreshCalendars}
             />
           )}
           {step === 'notification' && (
@@ -217,11 +240,17 @@ function ProfileStep({
 function CalendarStep({
   google,
   outlook,
-  onToggle,
+  backendConnected,
+  calendarsData,
+  onConnect,
+  onRefreshCalendars,
 }: {
   google: boolean
   outlook: boolean
-  onToggle: (provider: 'google' | 'outlook', connected: boolean) => void
+  backendConnected: boolean
+  calendarsData: CalendarsResponse | null
+  onConnect: (provider: 'google' | 'outlook') => void
+  onRefreshCalendars: () => void
 }) {
   return (
     <div>
@@ -235,15 +264,23 @@ function CalendarStep({
           label="Google Calendar"
           description="プライベート・社内予定の主流"
           connected={google}
-          onToggle={(v) => onToggle('google', v)}
+          backendConnected={backendConnected}
+          onConnect={() => onConnect('google')}
         />
+        {calendarsData && (
+          <CalendarSelector provider="google" state={calendarsData.google} onChanged={onRefreshCalendars} />
+        )}
         <CalendarRow
           icon={<Calendar size={20} className="text-navy-700" />}
           label="Outlook (Microsoft 365)"
           description="法人・Teams ご利用の方"
           connected={outlook}
-          onToggle={(v) => onToggle('outlook', v)}
+          backendConnected={backendConnected}
+          onConnect={() => onConnect('outlook')}
         />
+        {calendarsData && (
+          <CalendarSelector provider="outlook" state={calendarsData.outlook} onChanged={onRefreshCalendars} />
+        )}
       </div>
       {!google && !outlook && (
         <p className="text-xs text-gold-700 mt-4 flex items-center gap-1.5">
@@ -251,9 +288,11 @@ function CalendarStep({
           先へお進みいただくには、いずれか1つ以上のご連携が必要でございます。
         </p>
       )}
-      <p className="text-[11px] text-navy-400 italic mt-3">
-        ※ Phase 0 ではテスト用カレンダーへ接続いたします
-      </p>
+      {!backendConnected && (
+        <p className="text-[11px] text-navy-400 italic mt-3">
+          ※ Phase 0 ではテスト用カレンダーへ接続いたします
+        </p>
+      )}
     </div>
   )
 }
@@ -263,13 +302,15 @@ function CalendarRow({
   label,
   description,
   connected,
-  onToggle,
+  backendConnected,
+  onConnect,
 }: {
   icon: React.ReactNode
   label: string
   description: string
   connected: boolean
-  onToggle: (v: boolean) => void
+  backendConnected: boolean
+  onConnect: () => void
 }) {
   return (
     <div
@@ -281,20 +322,23 @@ function CalendarRow({
       <div className="shrink-0">{icon}</div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-navy-900">{label}</p>
-        <p className="text-xs text-navy-500 mt-0.5">{description}</p>
+        <p className="text-xs text-navy-500 mt-0.5">
+          {connected ? (backendConnected ? '連携中' : '連携中（デモ）') : description}
+        </p>
       </div>
-      <button
-        type="button"
-        onClick={() => onToggle(!connected)}
-        className={clsx(
-          'shrink-0 text-xs font-semibold rounded-md px-3 py-1.5 transition',
-          connected
-            ? 'bg-gold-500 text-navy-900 hover:bg-gold-600'
-            : 'bg-navy-800 text-gold-300 hover:bg-navy-900',
-        )}
-      >
-        {connected ? '連携中' : '連携する'}
-      </button>
+      {connected ? (
+        <span className="shrink-0 inline-flex items-center gap-1 text-xs font-semibold text-gold-700 px-3 py-1.5">
+          <Check size={14} /> 連携済み
+        </span>
+      ) : (
+        <button
+          type="button"
+          onClick={onConnect}
+          className="shrink-0 text-xs font-semibold rounded-md px-3 py-1.5 transition bg-navy-800 text-gold-300 hover:bg-navy-900"
+        >
+          連携する
+        </button>
+      )}
     </div>
   )
 }

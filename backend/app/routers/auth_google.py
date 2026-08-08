@@ -24,7 +24,7 @@ SCOPES = " ".join(
 
 
 @router.get("/login")
-def login():
+def login(state: str | None = None):
     params = {
         "client_id": settings.google_client_id,
         "redirect_uri": settings.google_redirect_uri,
@@ -33,13 +33,18 @@ def login():
         "access_type": "offline",
         "prompt": "consent",
     }
+    if state:
+        params["state"] = state
     return RedirectResponse(f"{AUTH_URL}?{urlencode(params)}")
 
 
 @router.get("/callback")
-async def callback(code: str | None = None, error: str | None = None):
+async def callback(code: str | None = None, error: str | None = None, state: str | None = None):
+    # stateはオンボーディング画面からの接続かどうかを判別するためだけに使う
+    # （オンボーディング側はカレンダー選択ステップへ戻す必要があるため、既定の/settingsとは別経路にする）
+    target_path = "/onboarding" if state == "onboarding" else "/settings"
     if error or not code:
-        return RedirectResponse(f"{settings.frontend_origin}/settings?error=google_{error or 'no_code'}")
+        return RedirectResponse(f"{settings.frontend_origin}{target_path}?error=google_{error or 'no_code'}")
 
     async with httpx.AsyncClient() as client:
         token_resp = await client.post(
@@ -78,5 +83,5 @@ async def callback(code: str | None = None, error: str | None = None):
 
     session_token = create_session_token(user_id, userinfo["email"])
     return RedirectResponse(
-        f"{settings.frontend_origin}/settings?connected=google&session={session_token}"
+        f"{settings.frontend_origin}{target_path}?connected=google&session={session_token}"
     )

@@ -21,7 +21,7 @@ def _token_url() -> str:
 
 
 @router.get("/login")
-def login():
+def login(state: str | None = None):
     params = {
         "client_id": settings.microsoft_client_id,
         "redirect_uri": settings.microsoft_redirect_uri,
@@ -29,13 +29,17 @@ def login():
         "scope": SCOPES,
         "response_mode": "query",
     }
+    if state:
+        params["state"] = state
     return RedirectResponse(f"{_authorize_url()}?{urlencode(params)}")
 
 
 @router.get("/callback")
-async def callback(code: str | None = None, error: str | None = None):
+async def callback(code: str | None = None, error: str | None = None, state: str | None = None):
+    # stateはオンボーディング画面からの接続かどうかを判別するためだけに使う
+    target_path = "/onboarding" if state == "onboarding" else "/settings"
     if error or not code:
-        return RedirectResponse(f"{settings.frontend_origin}/settings?error=outlook_{error or 'no_code'}")
+        return RedirectResponse(f"{settings.frontend_origin}{target_path}?error=outlook_{error or 'no_code'}")
 
     async with httpx.AsyncClient() as client:
         token_resp = await client.post(
@@ -77,5 +81,5 @@ async def callback(code: str | None = None, error: str | None = None):
 
     session_token = create_session_token(user_id, email)
     return RedirectResponse(
-        f"{settings.frontend_origin}/settings?connected=outlook&session={session_token}"
+        f"{settings.frontend_origin}{target_path}?connected=outlook&session={session_token}"
     )
