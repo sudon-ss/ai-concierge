@@ -114,6 +114,64 @@ async def create_event(
     return results
 
 
+async def hold_tentative_slots(
+    user_id: str, *, calendar: str, title: str, slots: list[dict]
+) -> list[dict]:
+    """候補枠を「[仮]」付きの予定として実際のカレンダーへ登録し、押さえた枠の一覧を返す。
+    相手の返答待ちの間に他の予定で埋まってしまうのを防ぐための機能。
+    登録先が複数選択されていれば、その全カレンダーに押さえる。
+    確定・キャンセル時に release_tentative_slots() で消せるよう、
+    削除に必要な calendar_id を含めて返す。
+    """
+    adapters = await get_write_adapters(user_id, calendar)
+    if not adapters:
+        raise ValueError(f"{calendar} が連携されていません")
+
+    async def hold_one(adapter, slot: dict) -> dict:
+        return await adapter.create_event(
+            title=f"[仮] {title}",
+            start=datetime.fromisoformat(slot["start"]),
+            end=datetime.fromisoformat(slot["end"]),
+        )
+
+    # 枠数×カレンダー数を直列で作ると体感が遅いため並列で登録する
+    return list(
+        await asyncio.gather(*[hold_one(a, s) for s in slots for a in adapters])
+    )
+
+
+async def release_tentative_slots(user_id: str, *, items: list[dict]) -> int:
+    """仮押さえした枠を削除する。items は [{calendar, event_id, calendar_id}]。
+    確定時（選ばれなかった枠と、確定枠に置き換わる元の仮枠の両方）と
+    キャンセル時の両方から呼ばれる。
+    一部が既に手動で消されていても全体を失敗させない。
+    """
+    adapters: dict[str, object] = {}
+    for provider in {item["calendar"] for item in items}:
+        adapter = await get_adapter(user_id, provider)
+        if adapter:
+            adapters[provider] = adapter
+
+    async def release_one(item: dict) -> bool:
+        adapter = adapters.get(item["calendar"])
+        if not adapter:
+            return False
+        try:
+            await adapter.delete_event(item["event_id"], calendar_id=item.get("calendar_id"))
+            return True
+        except Exception:
+            return False
+
+    results = await asyncio.gather(*[release_one(i) for i in items])
+
+    deleted_ids = [i["event_id"] for i, ok in zip(items, results) if ok]
+    if deleted_ids:
+        get_supabase().table("events").delete().eq("user_id", user_id).in_(
+            "ext_id", deleted_ids
+        ).execute()
+    return sum(results)
+
+
 async def create_task(
     user_id: str, *, title: str, due_date: str | None = None, priority: str = "medium"
 ) -> dict:

@@ -44,7 +44,7 @@ async def list_google_calendars(access_token: str) -> list[dict]:
         ]
 
 
-def _to_common(ev: dict) -> dict:
+def _to_common(ev: dict, calendar_id: str | None = None) -> dict:
     start = ev.get("start", {}).get("dateTime") or ev.get("start", {}).get("date")
     end = ev.get("end", {}).get("dateTime") or ev.get("end", {}).get("date")
     return {
@@ -54,6 +54,8 @@ def _to_common(ev: dict) -> dict:
         "end": end,
         "location": ev.get("location"),
         "source": "google",
+        # 削除時にどのカレンダーへ問い合わせるか判別するために保持する
+        "calendar_id": calendar_id,
     }
 
 
@@ -68,8 +70,10 @@ class GoogleCalendarAdapter(CalendarAdapter):
             base_url=API_BASE, headers={"Authorization": f"Bearer {access_token}"}
         )
         # 未選択時はprimary（既定カレンダー）にフォールバック（§10-4後続: 複数カレンダー対応、最大3件）
-        self._read_paths = [quote(cid, safe="") for cid in (read_calendar_ids or ["primary"])]
-        self._write_path = quote(write_calendar_id or (read_calendar_ids or ["primary"])[0], safe="")
+        self._read_ids = read_calendar_ids or ["primary"]
+        self._read_paths = [quote(cid, safe="") for cid in self._read_ids]
+        self._write_id = write_calendar_id or self._read_ids[0]
+        self._write_path = quote(self._write_id, safe="")
 
     async def list_events(self, time_min: datetime, time_max: datetime) -> list[dict]:
         params = {
@@ -79,13 +83,15 @@ class GoogleCalendarAdapter(CalendarAdapter):
             "orderBy": "startTime",
         }
 
-        async def fetch_one(path: str) -> list[dict]:
+        async def fetch_one(path: str, calendar_id: str) -> list[dict]:
             resp = await self._client.get(f"/calendars/{path}/events", params=params)
             resp.raise_for_status()
-            return [_to_common(ev) for ev in resp.json().get("items", [])]
+            return [_to_common(ev, calendar_id) for ev in resp.json().get("items", [])]
 
         # 複数カレンダー選択時も選択数に比例して遅くならないよう並列取得する
-        results = await asyncio.gather(*[fetch_one(p) for p in self._read_paths])
+        results = await asyncio.gather(
+            *[fetch_one(p, cid) for p, cid in zip(self._read_paths, self._read_ids)]
+        )
         return [ev for group in results for ev in group]
 
     async def create_event(
@@ -100,7 +106,7 @@ class GoogleCalendarAdapter(CalendarAdapter):
             body["location"] = location
         resp = await self._client.post(f"/calendars/{self._write_path}/events", json=body)
         resp.raise_for_status()
-        return _to_common(resp.json())
+        return _to_common(resp.json(), self._write_id)
 
     async def update_event(
         self, event_id: str, *, start: datetime | None = None, end: datetime | None = None
@@ -112,4 +118,11 @@ class GoogleCalendarAdapter(CalendarAdapter):
             body["end"] = {"dateTime": end.isoformat()}
         resp = await self._client.patch(f"/calendars/{self._write_path}/events/{event_id}", json=body)
         resp.raise_for_status()
-        return _to_common(resp.json())
+        return _to_common(resp.json(), self._write_id)
+
+    async def delete_event(self, event_id: str, *, calendar_id: str | None = None) -> None:
+        path = quote(calendar_id, safe="") if calendar_id else self._write_path
+        resp = await self._client.delete(f"/calendars/{path}/events/{event_id}")
+        # 既に削除済み（404）やキャンセル済み（410）は、結果として「無い」ので成功扱いにする
+        if resp.status_code not in (404, 410):
+            resp.raise_for_status()

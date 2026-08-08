@@ -70,7 +70,10 @@ export function MessageBubble({
               slots={message.content.slots}
               title={message.content.draft?.title}
               defaultLocation={message.content.draft?.location}
-              tentativeGroupId={message.content.tentativeGroupId}
+              tentativeGroupId={
+                message.content.tentativeGroupId ??
+                (message.content.tentativeRefs?.length ? 'backend' : undefined)
+              }
               onConfirm={(slot, calendar, location) =>
                 onConfirmSlot?.(message.id, slot, calendar, location)
               }

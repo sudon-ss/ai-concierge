@@ -20,3 +20,10 @@ class CalendarAdapter(ABC):
         self, event_id: str, *, start: datetime | None = None, end: datetime | None = None
     ) -> dict:
         """更新後のイベントを共通フォーマットで返す。"""
+
+    @abstractmethod
+    async def delete_event(self, event_id: str, *, calendar_id: str | None = None) -> None:
+        """イベントを削除する。既に無い場合（404/410）は成功扱いにする。
+        calendar_id を渡すと書き込み先ではなくそのカレンダーから削除する
+        （仮押さえは複数カレンダーに作られるため、作成時のカレンダーを指定して消す必要がある）。
+        """

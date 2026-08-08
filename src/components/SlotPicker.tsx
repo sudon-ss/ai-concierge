@@ -141,7 +141,7 @@ export function SlotPicker({
                           : 'bg-navy-100 text-navy-300 cursor-not-allowed pointer-events-none',
                       )}
                     >
-                      Googleへ登録
+                      {isBlocked ? 'Googleへ本確定' : 'Googleへ登録'}
                     </button>
                     <button
                       type="button"
@@ -154,7 +154,7 @@ export function SlotPicker({
                           : 'bg-navy-100 text-navy-300 cursor-not-allowed pointer-events-none',
                       )}
                     >
-                      Outlookへ登録
+                      {isBlocked ? 'Outlookへ本確定' : 'Outlookへ登録'}
                     </button>
                     <button
                       type="button"
@@ -167,9 +167,14 @@ export function SlotPicker({
                           : 'bg-navy-100 text-navy-300 cursor-not-allowed pointer-events-none',
                       )}
                     >
-                      {isBlocked ? '本確定（他の仮押さえを削除）' : '両方へ登録'}
+                      {isBlocked ? '両方へ本確定' : '両方へ登録'}
                     </button>
                   </div>
+                  {isBlocked && (
+                    <p className="text-[11px] text-navy-500">
+                      本確定すると、他の仮押さえ枠はカレンダーから削除されます
+                    </p>
+                  )}
                   {/* 本確定時はキャンセルで折りたたむだけ */}
                   <button
                     type="button"

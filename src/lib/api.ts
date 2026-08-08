@@ -207,6 +207,8 @@ export interface ApiEvent {
   end: string
   location?: string
   source: 'google' | 'outlook'
+  /** 削除時にどのカレンダーへ問い合わせるかの判別用（仮押さえの解除で使う） */
+  calendar_id?: string | null
 }
 
 export interface BriefingResponse {
@@ -236,6 +238,39 @@ export interface CreateEventInput {
  *  登録先が複数選択されている場合は、選んだ全カレンダーに同時登録されるため配列で返る。 */
 export function confirmEvent(input: CreateEventInput): Promise<ApiEvent[]> {
   return apiFetch<ApiEvent[]>('/api/events', { method: 'POST', body: JSON.stringify(input) })
+}
+
+/** 仮押さえした枠を後から削除するために必要な最小情報 */
+export interface TentativeRef {
+  calendar: 'google' | 'outlook'
+  event_id: string
+  calendar_id?: string | null
+}
+
+export const toTentativeRef = (ev: ApiEvent): TentativeRef => ({
+  calendar: ev.source,
+  event_id: ev.id,
+  calendar_id: ev.calendar_id ?? null,
+})
+
+/** 候補枠を「[仮]」付き予定として実カレンダーへ押さえる（相手の返答待ちの間の埋まり防止） */
+export function holdTentativeSlots(input: {
+  calendar: 'google' | 'outlook'
+  title: string
+  slots: { start: string; end: string }[]
+}): Promise<ApiEvent[]> {
+  return apiFetch<ApiEvent[]>('/api/events/tentative', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+}
+
+/** 仮押さえを解除する（予定確定時・キャンセル時の後片付け） */
+export function releaseTentativeSlots(items: TentativeRef[]): Promise<{ deleted: number }> {
+  return apiFetch<{ deleted: number }>('/api/events/tentative/release', {
+    method: 'POST',
+    body: JSON.stringify({ items }),
+  })
 }
 
 export interface CalendarOption {

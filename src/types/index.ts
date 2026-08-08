@@ -1,3 +1,5 @@
+import type { TentativeRef } from '../lib/api'
+
 export type CalendarSource = 'google' | 'outlook'
 
 export type MemoPriority = 'normal' | 'high' | 'critical'
@@ -44,7 +46,16 @@ export type MessageRole = 'user' | 'assistant'
 
 export type MessageContent =
   | { type: 'text'; text: string }
-  | { type: 'slots'; question: string; slots: FreeSlot[]; draft?: ExtractedDraft; tentativeGroupId?: string }
+  | {
+      type: 'slots'
+      question: string
+      slots: FreeSlot[]
+      draft?: ExtractedDraft
+      /** 仮押さえグループID（デモモード: ローカル予定をまとめて管理するため） */
+      tentativeGroupId?: string
+      /** 実データモードで仮押さえした実カレンダー上の予定（確定・取消時に削除する） */
+      tentativeRefs?: TentativeRef[]
+    }
   | {
       type: 'approval'
       selectedSlot: FreeSlot

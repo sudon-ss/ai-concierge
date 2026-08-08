@@ -14,10 +14,14 @@ import {
   getBriefing,
   getSession,
   hasBackend,
+  holdTentativeSlots,
+  releaseTentativeSlots,
   sendChatMessageStream,
+  toTentativeRef,
   type ApiEvent,
   type ApiTask,
   type ChatApiResponse,
+  type TentativeRef,
 } from '../lib/api'
 
 const uid = () => Math.random().toString(36).slice(2, 9)
@@ -473,6 +477,8 @@ export function ChatPage() {
       const msg = messages.find((m) => m.id === id)
       const title =
         (msg?.content.type === 'slots' && msg.content.draft?.title?.trim()) || '新しいご予定'
+      const tentativeRefs =
+        (msg?.content.type === 'slots' && msg.content.tentativeRefs) || []
       const targets: ('google' | 'outlook')[] = calendar === 'both' ? ['google', 'outlook'] : [calendar]
 
       Promise.allSettled(
@@ -503,6 +509,11 @@ export function ChatPage() {
             ),
           )
           return
+        }
+
+        // 本予定の登録に成功してから仮押さえを解除する（失敗時に枠を失わないための順序）
+        if (tentativeRefs.length > 0) {
+          releaseTentativeSlots(tentativeRefs).catch(() => {})
         }
 
         const primary = succeeded[0]
@@ -589,6 +600,39 @@ export function ChatPage() {
     const groupId = `tent-${uid()}`
     const title = draft?.title?.trim() || '新しいご予定'
 
+    if (hasBackend() && getSession()) {
+      // 実データモード: 連携済みカレンダーへ実際に「[仮]」予定を作成する
+      const provider: 'google' | 'outlook' = settings.calendarConnected.google ? 'google' : 'outlook'
+      holdTentativeSlots({
+        calendar: provider,
+        title,
+        slots: slots.map((s) => ({ start: s.start, end: s.end })),
+      })
+        .then((created) => {
+          const refs: TentativeRef[] = created.map(toTentativeRef)
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === id && m.content.type === 'slots'
+                ? { ...m, content: { ...m.content, tentativeRefs: refs } }
+                : m,
+            ),
+          )
+        })
+        .catch(() => {
+          append({
+            id: uid(),
+            role: 'assistant',
+            createdAt: new Date().toISOString(),
+            content: {
+              type: 'text',
+              text: '恐れ入ります、仮押さえに失敗いたしました。もう一度お試しくださいませ。',
+            },
+          })
+        })
+      return
+    }
+
+    // --- ここから下はPhase 0のローカルデモ用フォールバック ---
     // 全枠を仮予定としてカレンダーに追加
     slots.forEach((slot) => {
       addEvent({
@@ -618,6 +662,9 @@ export function ChatPage() {
     if (msg?.content.type === 'slots' && msg.content.tentativeGroupId) {
       const groupId = msg.content.tentativeGroupId
       events.filter((e) => e.tentativeGroupId === groupId).forEach((e) => deleteEvent(e.id))
+    }
+    if (msg?.content.type === 'slots' && msg.content.tentativeRefs?.length) {
+      releaseTentativeSlots(msg.content.tentativeRefs).catch(() => {})
     }
 
     setMessages((prev) =>

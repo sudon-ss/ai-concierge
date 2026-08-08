@@ -2,14 +2,16 @@ import asyncio
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from ..calendar_service import get_connected_adapters
 from ..dependencies import get_current_user
 from ..models import CalendarSource, SessionUser
-from ..tools import create_event
+from ..tools import create_event, hold_tentative_slots, release_tentative_slots
 
 router = APIRouter(prefix="/api/events", tags=["events"])
+
+MAX_TENTATIVE_SLOTS = 5
 
 
 @router.get("")
@@ -55,3 +57,66 @@ async def create_event_endpoint(body: CreateEventRequest, user: SessionUser = De
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return events
+
+
+class SlotInput(BaseModel):
+    start: str
+    end: str
+
+
+class HoldTentativeRequest(BaseModel):
+    calendar: CalendarSource
+    title: str
+    slots: list[SlotInput]
+
+    @field_validator("slots")
+    @classmethod
+    def limit_slots(cls, v: list[SlotInput]) -> list[SlotInput]:
+        if not v:
+            raise ValueError("仮押さえする枠を指定してください")
+        if len(v) > MAX_TENTATIVE_SLOTS:
+            raise ValueError(f"仮押さえは最大{MAX_TENTATIVE_SLOTS}枠までです")
+        return v
+
+
+@router.post("/tentative")
+async def hold_tentative_endpoint(
+    body: HoldTentativeRequest, user: SessionUser = Depends(get_current_user)
+):
+    """候補枠を「[仮]」付き予定として実カレンダーへ押さえる。
+    相手の返答を待つ間に他の予定で埋まるのを防ぐための機能。
+    """
+    try:
+        return await hold_tentative_slots(
+            user.user_id,
+            calendar=body.calendar,
+            title=body.title,
+            slots=[s.model_dump() for s in body.slots],
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+class TentativeRef(BaseModel):
+    calendar: CalendarSource
+    event_id: str
+    calendar_id: str | None = None
+
+
+class ReleaseTentativeRequest(BaseModel):
+    items: list[TentativeRef]
+
+
+@router.post("/tentative/release")
+async def release_tentative_endpoint(
+    body: ReleaseTentativeRequest, user: SessionUser = Depends(get_current_user)
+):
+    """仮押さえした枠を削除する（予定確定時・キャンセル時の後片付け）。
+    DELETEではなくPOSTなのは、削除対象の一覧をリクエストボディで受け取るため。
+    """
+    if not body.items:
+        return {"deleted": 0}
+    deleted = await release_tentative_slots(
+        user.user_id, items=[i.model_dump() for i in body.items]
+    )
+    return {"deleted": deleted}

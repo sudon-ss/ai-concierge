@@ -43,7 +43,7 @@ async def list_outlook_calendars(access_token: str) -> list[dict]:
         ]
 
 
-def _to_common(ev: dict) -> dict:
+def _to_common(ev: dict, calendar_id: str | None = None) -> dict:
     return {
         "id": ev["id"],
         "title": ev.get("subject", "(タイトルなし)"),
@@ -51,6 +51,8 @@ def _to_common(ev: dict) -> dict:
         "end": ev.get("end", {}).get("dateTime"),
         "location": (ev.get("location") or {}).get("displayName"),
         "source": "outlook",
+        # 削除時にどのカレンダーへ問い合わせるか判別するために保持する
+        "calendar_id": calendar_id,
     }
 
 
@@ -69,9 +71,10 @@ class OutlookCalendarAdapter(CalendarAdapter):
             },
         )
         # 未選択時は既定カレンダー（/me/...）にフォールバック（§10-4後続: 複数カレンダー対応、最大3件）
-        self._read_paths = [f"/me/calendars/{cid}" for cid in (read_calendar_ids or [])] or ["/me"]
-        write_id = write_calendar_id or (read_calendar_ids or [None])[0]
-        self._write_path = f"/me/calendars/{write_id}" if write_id else "/me"
+        self._read_ids: list[str | None] = list(read_calendar_ids or []) or [None]
+        self._read_paths = [f"/me/calendars/{cid}" if cid else "/me" for cid in self._read_ids]
+        self._write_id = write_calendar_id or self._read_ids[0]
+        self._write_path = f"/me/calendars/{self._write_id}" if self._write_id else "/me"
 
     async def list_events(self, time_min: datetime, time_max: datetime) -> list[dict]:
         params = {
@@ -80,13 +83,15 @@ class OutlookCalendarAdapter(CalendarAdapter):
             "$orderby": "start/dateTime",
         }
 
-        async def fetch_one(path: str) -> list[dict]:
+        async def fetch_one(path: str, calendar_id: str | None) -> list[dict]:
             resp = await self._client.get(f"{path}/calendarView", params=params)
             resp.raise_for_status()
-            return [_to_common(ev) for ev in resp.json().get("value", [])]
+            return [_to_common(ev, calendar_id) for ev in resp.json().get("value", [])]
 
         # 複数カレンダー選択時も選択数に比例して遅くならないよう並列取得する
-        results = await asyncio.gather(*[fetch_one(p) for p in self._read_paths])
+        results = await asyncio.gather(
+            *[fetch_one(p, cid) for p, cid in zip(self._read_paths, self._read_ids)]
+        )
         return [ev for group in results for ev in group]
 
     async def create_event(
@@ -101,7 +106,7 @@ class OutlookCalendarAdapter(CalendarAdapter):
             body["location"] = {"displayName": location}
         resp = await self._client.post(f"{self._write_path}/events", json=body)
         resp.raise_for_status()
-        return _to_common(resp.json())
+        return _to_common(resp.json(), self._write_id)
 
     async def update_event(
         self, event_id: str, *, start: datetime | None = None, end: datetime | None = None
@@ -113,4 +118,11 @@ class OutlookCalendarAdapter(CalendarAdapter):
             body["end"] = {"dateTime": end.isoformat(), "timeZone": "Asia/Tokyo"}
         resp = await self._client.patch(f"{self._write_path}/events/{event_id}", json=body)
         resp.raise_for_status()
-        return _to_common(resp.json())
+        return _to_common(resp.json(), self._write_id)
+
+    async def delete_event(self, event_id: str, *, calendar_id: str | None = None) -> None:
+        # Graphはイベントidが全カレンダー横断で一意なため /me/events/{id} で消せる
+        resp = await self._client.delete(f"/me/events/{event_id}")
+        # 既に削除済み（404）やキャンセル済み（410）は、結果として「無い」ので成功扱いにする
+        if resp.status_code not in (404, 410):
+            resp.raise_for_status()
