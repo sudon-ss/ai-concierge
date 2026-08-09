@@ -1,0 +1,637 @@
+<title>THE CONCIERGE 導入マニュアル</title>
+
+<style>
+  :root {
+    --paper:      #fdfcf8;
+    --card:       #ffffff;
+    --ink:        #050f1e;
+    --ink-soft:   #1e3a5f;
+    --muted:      #5c739a;
+    --rule:       #cbd3e3;
+    --rule-soft:  #e6eaf2;
+    --accent:     #c9a55c;
+    --accent-ink: #856732;
+    --accent-bg:  #fbf7eb;
+    --caution:    #9b3d3d;
+    --caution-bg: #fbf1ef;
+    --caution-rule:#e3c3bd;
+
+    --serif: Georgia, "Hiragino Mincho ProN", "Yu Mincho", YuMincho, "MS PMincho", serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Yu Gothic UI", Meiryo, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+    --measure: 34rem;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper:      #050f1e;
+      --card:       #0a1a30;
+      --ink:        #eef1f7;
+      --ink-soft:   #cbd3e3;
+      --muted:      #94a3c0;
+      --rule:       #1e3a5f;
+      --rule-soft:  #162e4d;
+      --accent:     #dfbe6c;
+      --accent-ink: #ead498;
+      --accent-bg:  #14203a;
+      --caution:    #e8a49a;
+      --caution-bg: #24161a;
+      --caution-rule:#5c3230;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:      #050f1e;
+    --card:       #0a1a30;
+    --ink:        #eef1f7;
+    --ink-soft:   #cbd3e3;
+    --muted:      #94a3c0;
+    --rule:       #1e3a5f;
+    --rule-soft:  #162e4d;
+    --accent:     #dfbe6c;
+    --accent-ink: #ead498;
+    --accent-bg:  #14203a;
+    --caution:    #e8a49a;
+    --caution-bg: #24161a;
+    --caution-rule:#5c3230;
+  }
+  :root[data-theme="light"] {
+    --paper:      #fdfcf8;
+    --card:       #ffffff;
+    --ink:        #050f1e;
+    --ink-soft:   #1e3a5f;
+    --muted:      #5c739a;
+    --rule:       #cbd3e3;
+    --rule-soft:  #e6eaf2;
+    --accent:     #c9a55c;
+    --accent-ink: #856732;
+    --accent-bg:  #fbf7eb;
+    --caution:    #9b3d3d;
+    --caution-bg: #fbf1ef;
+    --caution-rule:#e3c3bd;
+  }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.85;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: var(--measure);
+    margin: 0 auto;
+    padding: 4rem 1.5rem 6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 4rem;
+  }
+
+  /* ---------- masthead ---------- */
+  .masthead { display: flex; flex-direction: column; gap: .9rem; }
+  .wordmark {
+    font-family: var(--serif);
+    font-size: clamp(1.4rem, 5vw, 1.85rem);
+    letter-spacing: .34em;
+    text-indent: .34em;
+    color: var(--ink);
+    line-height: 1.2;
+  }
+  .hairline { height: 1px; background: linear-gradient(90deg, var(--accent), transparent); }
+  .masthead h1 {
+    font-family: var(--serif);
+    font-size: clamp(1.9rem, 7vw, 2.6rem);
+    line-height: 1.4;
+    letter-spacing: .03em;
+    font-weight: 600;
+    text-wrap: balance;
+    margin: 0;
+  }
+  .masthead p { color: var(--muted); margin: 0; font-size: .95rem; }
+
+  /* ---------- start-here panel ---------- */
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+  }
+  .panel-title {
+    font-family: var(--serif);
+    font-size: 1.15rem;
+    letter-spacing: .05em;
+    margin: 0;
+  }
+  .urlbox {
+    display: flex;
+    flex-direction: column;
+    gap: .3rem;
+    background: var(--accent-bg);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: .9rem 1rem;
+  }
+  .urlbox .lbl {
+    font-size: .68rem;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--accent-ink);
+    font-weight: 700;
+  }
+  .urlbox a {
+    font-family: var(--mono);
+    font-size: .92rem;
+    color: var(--ink);
+    word-break: break-all;
+    text-decoration: none;
+    border-bottom: 1px solid var(--accent);
+    align-self: flex-start;
+    line-height: 1.5;
+  }
+  .urlbox a:hover, .urlbox a:focus-visible { background: var(--accent-bg); }
+
+  .checklist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .55rem; }
+  .checklist li {
+    display: grid;
+    grid-template-columns: 1.1rem 1fr;
+    gap: .6rem;
+    align-items: start;
+    font-size: .93rem;
+  }
+  .checklist li::before {
+    content: "";
+    width: .62rem; height: .62rem;
+    margin-top: .58rem;
+    border: 1.5px solid var(--accent);
+    border-radius: 2px;
+  }
+
+  /* ---------- sections ---------- */
+  section { display: flex; flex-direction: column; gap: 1.6rem; }
+  .eyebrow {
+    display: flex; align-items: center; gap: .8rem;
+    font-size: .68rem; letter-spacing: .2em; text-transform: uppercase;
+    color: var(--accent-ink); font-weight: 700;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 1px; background: var(--rule); }
+  section > h2 {
+    font-family: var(--serif);
+    font-size: clamp(1.45rem, 5.5vw, 1.85rem);
+    line-height: 1.45;
+    letter-spacing: .03em;
+    font-weight: 600;
+    margin: -.7rem 0 0;
+    text-wrap: balance;
+  }
+  section > .lede { margin: -.9rem 0 0; color: var(--muted); font-size: .95rem; }
+  h3 {
+    font-family: var(--serif);
+    font-size: 1.12rem;
+    letter-spacing: .04em;
+    font-weight: 600;
+    margin: .6rem 0 -.6rem;
+  }
+  p { margin: 0; }
+  a { color: var(--accent-ink); }
+
+  /* ---------- numbered step rail ---------- */
+  .steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1.5rem; }
+  .steps > li {
+    display: grid;
+    grid-template-columns: 2.1rem 1fr;
+    gap: 1rem;
+    align-items: start;
+  }
+  .steps > li::before {
+    content: counter(step);
+    counter-increment: step;
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    font-size: .8rem;
+    font-weight: 600;
+    color: var(--accent-ink);
+    background: var(--accent-bg);
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    width: 2.1rem; height: 2.1rem;
+    display: grid; place-items: center;
+    margin-top: -.15rem;
+  }
+  .steps { counter-reset: step; }
+  .steps .body { display: flex; flex-direction: column; gap: .55rem; min-width: 0; }
+  .steps .body > strong { font-weight: 600; font-size: 1rem; }
+  .steps .body p { font-size: .93rem; color: var(--ink-soft); }
+
+  /* ---------- callouts ---------- */
+  .note, .caution {
+    border-radius: 8px;
+    padding: .95rem 1.1rem;
+    display: flex; flex-direction: column; gap: .45rem;
+    font-size: .9rem;
+    line-height: 1.75;
+  }
+  .note { background: var(--accent-bg); border: 1px solid var(--rule); border-left: 3px solid var(--accent); }
+  .caution { background: var(--caution-bg); border: 1px solid var(--caution-rule); border-left: 3px solid var(--caution); }
+  .note .hd, .caution .hd {
+    font-size: .68rem; letter-spacing: .16em; text-transform: uppercase; font-weight: 700;
+  }
+  .note .hd { color: var(--accent-ink); }
+  .caution .hd { color: var(--caution); }
+  .note p, .caution p { color: var(--ink-soft); }
+
+  /* ---------- on-screen labels ---------- */
+  .ui {
+    font-family: var(--sans);
+    font-size: .84em;
+    font-weight: 600;
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: .1em .45em;
+    white-space: nowrap;
+    color: var(--ink);
+  }
+  .path { font-family: var(--mono); font-size: .85em; color: var(--ink-soft); }
+  code { font-family: var(--mono); font-size: .86em; word-break: break-all; }
+
+  /* ---------- comparison table ---------- */
+  .tablewrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 8px; }
+  table { border-collapse: collapse; width: 100%; min-width: 30rem; font-size: .88rem; background: var(--card); }
+  th, td { text-align: left; padding: .7rem .85rem; border-bottom: 1px solid var(--rule-soft); vertical-align: top; line-height: 1.65; }
+  thead th {
+    font-size: .68rem; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--accent-ink); font-weight: 700; background: var(--accent-bg);
+    border-bottom: 1px solid var(--rule);
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td .pick { color: var(--accent-ink); font-weight: 700; }
+
+  /* ---------- two-up ---------- */
+  .twoup { display: grid; gap: 1.25rem; }
+  @media (min-width: 34rem) { .twoup { grid-template-columns: 1fr 1fr; } }
+  .device {
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    padding: 1.15rem 1.25rem;
+    display: flex; flex-direction: column; gap: .7rem;
+  }
+  .device h4 {
+    margin: 0;
+    font-family: var(--serif);
+    font-size: 1.05rem;
+    letter-spacing: .04em;
+    font-weight: 600;
+  }
+  .device ol { margin: 0; padding-left: 1.15rem; display: flex; flex-direction: column; gap: .45rem; font-size: .9rem; color: var(--ink-soft); }
+
+  /* ---------- faq ---------- */
+  .faq { display: flex; flex-direction: column; gap: 0; border-top: 1px solid var(--rule-soft); }
+  .faq details { border-bottom: 1px solid var(--rule-soft); }
+  .faq summary {
+    cursor: pointer; padding: .95rem .2rem; font-weight: 600; font-size: .95rem;
+    list-style: none; display: flex; gap: .7rem; align-items: baseline;
+  }
+  .faq summary::-webkit-details-marker { display: none; }
+  .faq summary::before { content: "Q"; font-family: var(--serif); color: var(--accent-ink); font-weight: 700; }
+  .faq summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+  .faq details > div { padding: 0 .2rem 1.1rem 1.6rem; font-size: .92rem; color: var(--ink-soft); display: flex; flex-direction: column; gap: .5rem; }
+
+  footer {
+    border-top: 1px solid var(--rule);
+    padding-top: 1.4rem;
+    color: var(--muted);
+    font-size: .82rem;
+    display: flex; flex-direction: column; gap: .35rem;
+  }
+
+  @media print {
+    body { background: #fff; }
+    .wrap { padding: 0; gap: 2.5rem; max-width: none; }
+    .faq details { open: true; }
+    .faq details > div { display: flex !important; }
+    section { break-inside: avoid-page; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="wordmark">THE CONCIERGE</div>
+    <div class="hairline"></div>
+    <h1>はじめての方向け<br>セットアップ手引き</h1>
+    <p>Googleカレンダーとの連携、スマホからのワンタップ起動、iPhoneカレンダーをお使いの方の移行手順まで。所要時間はおよそ10分です。</p>
+  </header>
+
+  <div class="panel">
+    <h2 class="panel-title">始める前に</h2>
+
+    <div class="urlbox">
+      <span class="lbl">アプリのURL</span>
+      <a href="https://the-concierge-delta.vercel.app">https://the-concierge-delta.vercel.app</a>
+    </div>
+
+    <ul class="checklist">
+      <li><span><strong>使用するGmailアドレスを管理者に伝えて、利用登録を済ませておく。</strong>現在このアプリはテスト運用中で、登録済みのアドレスからしか連携できません。未登録のままだとGoogleのログイン画面でブロックされます。</span></li>
+      <li><span>スマホで設定するのがおすすめです。パソコンでも同じ手順で使えます。</span></li>
+      <li><span>iPhoneの方は<strong>Safari</strong>で開いてください。ホーム画面への追加がSafariから行えます。</span></li>
+    </ul>
+  </div>
+
+  <!-- ============ 1 ============ -->
+  <section>
+    <div class="eyebrow">Part 1</div>
+    <h2>Googleカレンダーをつなぐ</h2>
+    <p class="lede">アプリに「あなたのカレンダーを読み書きしてよい」と許可を与える作業です。パスワードをアプリに預けることはありません。</p>
+
+    <ol class="steps">
+      <li>
+        <div class="body">
+          <strong>アプリのURLを開く</strong>
+          <p>上のURLを開くと、金色の<span class="ui">はじめる</span>ボタンがある画面が出ます。押して進みます。</p>
+        </div>
+      </li>
+      <li>
+        <div class="body">
+          <strong>お立場を選ぶ（STEP 1/3）</strong>
+          <p><span class="ui">社長</span><span class="ui">役員</span><span class="ui">CFO</span>から選びます。秘書があなたをどう呼ぶかが変わるだけなので、深く悩まず選んで<span class="ui">次へ</span>を押してください。あとから設定画面で変更できます。</p>
+        </div>
+      </li>
+      <li>
+        <div class="body">
+          <strong>「カレンダーをご連携」でGoogleの<span class="ui">連携する</span>を押す（STEP 2/3）</strong>
+          <p>Googleのログイン画面に切り替わります。<strong>ここで1つ以上つながないと次へ進めません。</strong></p>
+        </div>
+      </li>
+      <li>
+        <div class="body">
+          <strong>使いたいGoogleアカウントを選ぶ</strong>
+          <p>複数のアカウントでログインしている場合は、<strong>管理者に伝えたアドレス</strong>を選んでください。別のアドレスを選ぶとブロックされます。</p>
+        </div>
+      </li>
+      <li>
+        <div class="body">
+          <strong>「このアプリはGoogleで確認されていません」を通過する</strong>
+          <p>審査前の社内テストアプリのため、警告画面が出ます。画面左下の<span class="ui">詳細</span>を押し、下に出てくる<span class="ui">（安全ではないページ）に移動</span>を押してください。</p>
+          <div class="caution">
+            <span class="hd">この警告について</span>
+            <p>これはGoogleの審査をまだ受けていない開発中アプリすべてに出る表示で、不具合ではありません。今回は自分たちで作ったアプリだと分かっているため進んで問題ありません。一般公開時には審査を通すのでこの画面は出なくなります。</p>
+          </div>
+        </div>
+      </li>
+      <li>
+        <div class="body">
+          <strong>カレンダーへのアクセスを許可する</strong>
+          <p>「予定の表示・編集」の許可を求められます。チェックを入れて<span class="ui">続行</span>を押すと、アプリに戻ります。</p>
+        </div>
+      </li>
+      <li>
+        <div class="body">
+          <strong>「参照」と「登録先」のカレンダーを選ぶ</strong>
+          <p>アプリに戻ると、カレンダー連携の画面に戻ってきます。カレンダーを複数お持ちの方は、ここで選択欄が出ます。</p>
+          <div class="note">
+            <span class="hd">2つの設定の違い</span>
+            <p><strong>参照</strong>＝空き時間を探すときに「予定が入っている」とみなすカレンダー。仕事用と個人用の両方を選んでおくと、プライベートの予定に会議を入れられずに済みます。</p>
+            <p><strong>登録先</strong>＝新しい予定を書き込むカレンダー。複数選ぶと、その全部に同時に登録されます。</p>
+            <p>どちらも最大3つまで。カレンダーが1つしかない方はこの欄は表示されません（自動でそのカレンダーが使われます）。</p>
+          </div>
+        </div>
+      </li>
+      <li>
+        <div class="body">
+          <strong>お知らせの時間を決めて完了（STEP 3/3）</strong>
+          <p>朝のブリーフィングの時刻と、予定の何分前に知らせるかを選び、<span class="ui">利用を開始する</span>を押せば設定完了です。</p>
+        </div>
+      </li>
+    </ol>
+
+    <h3>うまくいかないとき</h3>
+    <div class="note">
+      <span class="hd">エラーと出たら、まずもう一度</span>
+      <p>Googleのログイン途中で「エラーが発生しました」と出ることがあります。多くは一時的なもので、もう一度<span class="ui">連携する</span>からやり直すと通ります。シークレットウィンドウ／プライベートブラウズでは失敗しやすいので、通常のウィンドウでお試しください。</p>
+    </div>
+    <div class="caution">
+      <span class="hd">「アクセスをブロックしました」と出る場合</span>
+      <p>そのGoogleアドレスがまだ利用登録されていません。使いたいアドレスを管理者に伝えて、登録後にもう一度お試しください。</p>
+    </div>
+  </section>
+
+  <!-- ============ 2 ============ -->
+  <section>
+    <div class="eyebrow">Part 2</div>
+    <h2>スマホのホーム画面から<br>ワンタップで開く</h2>
+    <p class="lede">アプリストアからのインストールは不要です。ホーム画面にアイコンを置けば、普通のアプリと同じように全画面で起動します。毎回URLを入力する必要はありません。</p>
+
+    <div class="twoup">
+      <div class="device">
+        <h4>iPhone・iPad</h4>
+        <ol>
+          <li><strong>Safari</strong>でアプリのURLを開く</li>
+          <li>画面下中央の<strong>共有ボタン</strong>（□に↑が刺さったマーク）を押す</li>
+          <li>メニューを下にスクロールして<span class="ui">ホーム画面に追加</span>を押す</li>
+          <li>名前を確認して右上の<span class="ui">追加</span>を押す</li>
+        </ol>
+        <div class="caution">
+          <span class="hd">注意</span>
+          <p>Chromeなど他のブラウザからだとこの項目が出ないことがあります。必ずSafariで開いてください。</p>
+        </div>
+      </div>
+
+      <div class="device">
+        <h4>Android</h4>
+        <ol>
+          <li><strong>Chrome</strong>でアプリのURLを開く</li>
+          <li>右上の<strong>︙</strong>（三点メニュー）を押す</li>
+          <li><span class="ui">ホーム画面に追加</span>または<span class="ui">アプリをインストール</span>を押す</li>
+          <li>確認画面で<span class="ui">追加</span>／<span class="ui">インストール</span>を押す</li>
+        </ol>
+        <p style="font-size:.86rem;color:var(--muted)">機種によっては画面下部に「アプリをインストール」の案内が自動で出ます。そちらを押しても同じです。</p>
+      </div>
+    </div>
+
+    <div class="note">
+      <span class="hd">追加したあと</span>
+      <p>ホーム画面のアイコンから開くと、ブラウザのアドレスバーが消えて全画面になります。ログイン状態も保持されるので、次からはタップするだけで秘書が立ち上がります。</p>
+    </div>
+
+    <h3>リマインダーについて</h3>
+    <div class="caution">
+      <span class="hd">今のところ、アプリを開いている間だけ鳴ります</span>
+      <p>予定前のお知らせは、アプリを開いている状態で画面に出る仕組みです。アプリを閉じている間にスマホへ通知を飛ばす機能はまだ入っていません。</p>
+      <p>そのぶん、リマインダーをオンにしている間は<strong>画面が自動で暗くならない</strong>ようにしてあります。会議前に開いたまま置いておけば見逃しません。</p>
+    </div>
+  </section>
+
+  <!-- ============ 3 ============ -->
+  <section>
+    <div class="eyebrow">Part 3</div>
+    <h2>iPhoneのカレンダーを<br>使っている方へ</h2>
+    <p class="lede">この秘書はGoogleカレンダーとOutlookに対応しています。iPhone標準の「カレンダー」アプリでiCloudに予定を入れている方は、Googleカレンダー側でも予定が見えるようにする必要があります。方法は3つあります。</p>
+
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr>
+            <th>方法</th>
+            <th>向いている人</th>
+            <th>できること</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="pick">A. これからGoogleに貯める</span><br><span style="color:var(--muted)">おすすめ</span></td>
+            <td>これから本格的に使う人</td>
+            <td>読み書きとも即時。秘書から予定を入れると、iPhoneのカレンダーアプリにもすぐ出る</td>
+          </tr>
+          <tr>
+            <td>B. iCloudを覗き見させる</td>
+            <td>今の運用を変えたくない人</td>
+            <td><strong>読み取りのみ。</strong>反映は最大1日遅れ。秘書からは書き込めない</td>
+          </tr>
+          <tr>
+            <td>C. 過去分を一度だけ移す</td>
+            <td>これまでの予定も持っていきたい人</td>
+            <td>一回きりのコピー。以降は同期しない</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>方法A：iPhoneにGoogleアカウントを追加する（おすすめ）</h3>
+    <p style="font-size:.93rem;color:var(--ink-soft)">iPhone標準のカレンダーアプリはそのまま使いつつ、予定の保存先だけGoogleに変える方法です。見た目の操作は今までどおりで、裏側がGoogleカレンダーになります。</p>
+    <ol class="steps">
+      <li>
+        <div class="body">
+          <strong>設定からカレンダーのアカウント追加画面を開く</strong>
+          <p><span class="path">設定 → アプリ → カレンダー → カレンダーアカウント → アカウントを追加</span></p>
+          <p>iOS 17以前の場合は <span class="path">設定 → カレンダー → アカウント → アカウントを追加</span> です。お使いのバージョンで表示が違うときは、設定画面の検索窓に「カレンダー」と入れると早く辿り着けます。</p>
+        </div>
+      </li>
+      <li>
+        <div class="body">
+          <strong><span class="ui">Google</span>を選んでログインする</strong>
+          <p>秘書アプリで連携したのと<strong>同じGoogleアドレス</strong>でログインしてください。</p>
+        </div>
+      </li>
+      <li>
+        <div class="body">
+          <strong>「カレンダー」をオンにする</strong>
+          <p>メール・連絡先などの一覧が出るので、少なくとも<span class="ui">カレンダー</span>をオンにして保存します。</p>
+        </div>
+      </li>
+      <li>
+        <div class="body">
+          <strong>新規予定の保存先をGoogleに変える</strong>
+          <p><span class="path">設定 → アプリ → カレンダー → デフォルトカレンダー</span> で、Googleアカウント側のカレンダーを選びます。</p>
+          <div class="note">
+            <span class="hd">この一手間が肝心です</span>
+            <p>ここを変えないと、iPhoneで作った予定はこれまでどおりiCloudに保存され、秘書からは見えないままになります。</p>
+          </div>
+        </div>
+      </li>
+    </ol>
+
+    <h3>方法B：iCloudカレンダーをGoogleに購読させる</h3>
+    <p style="font-size:.93rem;color:var(--ink-soft)">iCloudに予定を貯めたまま、Googleカレンダー側から覗くだけの方法です。手軽ですが制約が大きいので、上の方法Aが使えるならそちらをおすすめします。</p>
+    <ol class="steps">
+      <li>
+        <div class="body">
+          <strong>iPhoneでカレンダーを公開する</strong>
+          <p>カレンダーアプリ →下部の<span class="ui">カレンダー</span>→共有したいカレンダーの<span class="ui">ⓘ</span>→<span class="ui">公開カレンダー</span>をオン→<span class="ui">共有リンクをコピー</span>。</p>
+        </div>
+      </li>
+      <li>
+        <div class="body">
+          <strong>GoogleカレンダーにURLで追加する</strong>
+          <p>パソコンでGoogleカレンダーを開き、左側の<span class="ui">他のカレンダー</span>の<span class="ui">＋</span>→<span class="ui">URLで追加</span>。コピーしたリンクを貼り付けます。先頭が <code>webcal://</code> の場合は <code>https://</code> に書き換えてください。</p>
+        </div>
+      </li>
+    </ol>
+    <div class="caution">
+      <span class="hd">方法Bの制約</span>
+      <p><strong>読み取り専用です。</strong>秘書から予定を入れたり動かしたりはできません。また、Google側への反映は即時ではなく最大1日ほど遅れることがあるため、直前の予定変更が空き時間チェックに反映されない可能性があります。</p>
+      <p>公開カレンダーのリンクを知っている人は誰でも予定を閲覧できます。仕事の機密予定が入っているカレンダーでは使わないでください。</p>
+    </div>
+
+    <h3>方法C：これまでの予定を一度だけ移す</h3>
+    <ol class="steps">
+      <li>
+        <div class="body">
+          <strong>パソコンでiCloud.comからカレンダーを書き出す</strong>
+          <p>iCloud.comのカレンダーを開き、対象カレンダーを共有設定から公開して、そのリンクをブラウザで開くと <code>.ics</code> ファイルが手に入ります。Macをお使いなら、カレンダーアプリの <span class="path">ファイル → 書き出す</span> のほうが簡単です。</p>
+        </div>
+      </li>
+      <li>
+        <div class="body">
+          <strong>Googleカレンダーに読み込む</strong>
+          <p>Googleカレンダーの <span class="path">設定 → インポート/エクスポート → インポート</span> で <code>.ics</code> を選び、取り込み先のカレンダーを指定します。</p>
+        </div>
+      </li>
+    </ol>
+    <div class="note">
+      <span class="hd">仕上げに</span>
+      <p>方法Cは過去分のコピーです。これから作る予定も秘書に見せたい場合は、あわせて方法Aの設定もしておいてください。</p>
+    </div>
+  </section>
+
+  <!-- ============ FAQ ============ -->
+  <section>
+    <div class="eyebrow">よくある質問</div>
+
+    <div class="faq">
+      <details>
+        <summary>秘書にどう話しかければいいですか？</summary>
+        <div>
+          <p>チャット画面で、人に頼むように書けば伝わります。「来週、田中さんと1時間打ち合わせしたい」「明日の午後空いてる？」「木曜の商談を30分後ろ倒しして」といった具合です。音声入力ボタンからしゃべっても構いません。</p>
+        </div>
+      </details>
+      <details>
+        <summary>勝手に予定を入れられてしまいませんか？</summary>
+        <div>
+          <p>入りません。登録・変更の前に必ず内容を読み上げて確認を取り、「お願いします」などと返して初めて実行します。</p>
+        </div>
+      </details>
+      <details>
+        <summary>「仮押さえ」とは何ですか？</summary>
+        <div>
+          <p>候補日を相手に送ったあと、返事を待つ間に他の予定で埋まってしまうのを防ぐ機能です。候補枠すべてを<strong>［仮］付きの予定</strong>としてカレンダーに入れておき、日程が決まって本確定すると、選ばなかった枠は自動で消えます。</p>
+        </div>
+      </details>
+      <details>
+        <summary>登録先を3つ選ぶと、予定変更も3つ全部に反映されますか？</summary>
+        <div>
+          <p>反映されます。「30分後ろ倒し」と伝えれば、同じ予定のコピー全部が一緒に動きます。予定一覧の画面でも、同じ予定は1件にまとめて表示されます。</p>
+        </div>
+      </details>
+      <details>
+        <summary>Outlookも使えますか？</summary>
+        <div>
+          <p>アプリ側の対応は済んでいますが、現在Microsoft側の設定作業中です。使えるようになり次第お知らせします。それまではGoogleカレンダーでお使いください。</p>
+        </div>
+      </details>
+      <details>
+        <summary>連携をやめたいときは？</summary>
+        <div>
+          <p>アプリの<span class="ui">PROFILE</span>（設定）画面から<span class="ui">解除</span>を押してください。あわせてGoogleアカウント側からも取り消したい場合は、Googleアカウントの「セキュリティ」→「サードパーティ製アプリとの連携」から解除できます。</p>
+        </div>
+      </details>
+      <details>
+        <summary>最初の画面に戻ってやり直したい</summary>
+        <div>
+          <p><span class="ui">PROFILE</span>画面をいちばん下までスクロールし、<span class="ui">初期セットアップをやり直す</span>を押してください。</p>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <footer>
+    <div>THE CONCIERGE ／ 社内テスト版のご案内</div>
+    <div>不具合や「ここが分かりにくい」と感じた点は、遠慮なく開発担当までお寄せください。</div>
+  </footer>
+
+</div>
