@@ -1,0 +1,477 @@
+<title>THE CONCIERGE 実装差分・アーキテクチャ</title>
+
+<style>
+  :root {
+    --paper:#fdfcf8; --card:#ffffff; --ink:#050f1e; --ink-soft:#1e3a5f; --muted:#5c739a;
+    --rule:#cbd3e3; --rule-soft:#e6eaf2;
+    --accent:#c9a55c; --accent-ink:#856732; --accent-bg:#fbf7eb;
+    --warn:#9b3d3d; --warn-bg:#fbf1ef; --warn-rule:#e3c3bd;
+    --add:#2f6b52; --add-bg:#eef5f1; --add-rule:#bcd6c9;
+    --serif: Georgia,"Hiragino Mincho ProN","Yu Mincho",YuMincho,"MS PMincho",serif;
+    --sans: -apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Sans","Yu Gothic UI",Meiryo,sans-serif;
+    --mono: ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper:#050f1e; --card:#0a1a30; --ink:#eef1f7; --ink-soft:#cbd3e3; --muted:#94a3c0;
+      --rule:#1e3a5f; --rule-soft:#162e4d;
+      --accent:#dfbe6c; --accent-ink:#ead498; --accent-bg:#14203a;
+      --warn:#e8a49a; --warn-bg:#24161a; --warn-rule:#5c3230;
+      --add:#8fc9ad; --add-bg:#13241d; --add-rule:#2f5544;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:#050f1e; --card:#0a1a30; --ink:#eef1f7; --ink-soft:#cbd3e3; --muted:#94a3c0;
+    --rule:#1e3a5f; --rule-soft:#162e4d;
+    --accent:#dfbe6c; --accent-ink:#ead498; --accent-bg:#14203a;
+    --warn:#e8a49a; --warn-bg:#24161a; --warn-rule:#5c3230;
+    --add:#8fc9ad; --add-bg:#13241d; --add-rule:#2f5544;
+  }
+  :root[data-theme="light"] {
+    --paper:#fdfcf8; --card:#ffffff; --ink:#050f1e; --ink-soft:#1e3a5f; --muted:#5c739a;
+    --rule:#cbd3e3; --rule-soft:#e6eaf2;
+    --accent:#c9a55c; --accent-ink:#856732; --accent-bg:#fbf7eb;
+    --warn:#9b3d3d; --warn-bg:#fbf1ef; --warn-rule:#e3c3bd;
+    --add:#2f6b52; --add-bg:#eef5f1; --add-rule:#bcd6c9;
+  }
+
+  body { background:var(--paper); color:var(--ink); font-family:var(--sans); font-size:16px; line-height:1.85; -webkit-font-smoothing:antialiased; }
+  .wrap { max-width:44rem; margin:0 auto; padding:3.5rem 1.5rem 6rem; display:flex; flex-direction:column; gap:3.5rem; }
+
+  .masthead { display:flex; flex-direction:column; gap:.85rem; }
+  .wordmark { font-family:var(--serif); font-size:1.5rem; letter-spacing:.3em; text-indent:.3em; line-height:1.2; }
+  .hairline { height:1px; background:linear-gradient(90deg,var(--accent),transparent); }
+  .masthead h1 { font-family:var(--serif); font-size:clamp(1.8rem,6vw,2.4rem); line-height:1.4; letter-spacing:.03em; font-weight:600; margin:0; text-wrap:balance; }
+  .masthead .meta { color:var(--muted); font-size:.9rem; margin:0; }
+
+  section { display:flex; flex-direction:column; gap:1.4rem; }
+  .eyebrow { display:flex; align-items:center; gap:.8rem; font-size:.68rem; letter-spacing:.2em; text-transform:uppercase; color:var(--accent-ink); font-weight:700; }
+  .eyebrow::after { content:""; flex:1; height:1px; background:var(--rule); }
+  section > h2 { font-family:var(--serif); font-size:clamp(1.4rem,5vw,1.75rem); line-height:1.45; letter-spacing:.03em; font-weight:600; margin:-.6rem 0 0; text-wrap:balance; }
+  h3 { font-family:var(--serif); font-size:1.1rem; letter-spacing:.04em; font-weight:600; margin:.7rem 0 -.7rem; }
+  p { margin:0; }
+  strong { font-weight:600; }
+  code { font-family:var(--mono); font-size:.85em; background:var(--accent-bg); border:1px solid var(--rule); border-radius:4px; padding:.08em .35em; word-break:break-all; }
+
+  /* 要約カード */
+  .summary { display:flex; flex-direction:column; gap:.9rem; background:var(--card); border:1px solid var(--rule); border-radius:10px; padding:1.4rem; }
+  .summary ol { margin:0; padding-left:1.3rem; display:flex; flex-direction:column; gap:.7rem; font-size:.95rem; }
+
+  /* 図 */
+  figure { margin:0; display:flex; flex-direction:column; gap:.7rem; }
+  .figbox { background:var(--card); border:1px solid var(--rule); border-radius:10px; padding:1.2rem 1rem; overflow-x:auto; }
+  figure svg { display:block; max-width:100%; height:auto; margin:0 auto; color:var(--ink-soft); }
+  figcaption { font-size:.85rem; color:var(--muted); line-height:1.7; }
+
+  .dg-box { fill:var(--card); stroke:currentColor; stroke-width:1.2; }
+  .dg-box-dim { fill:none; stroke:currentColor; stroke-width:1.1; stroke-dasharray:4 3; opacity:.55; }
+  .dg-box-acc { fill:var(--accent-bg); stroke:var(--accent); stroke-width:1.6; }
+  .dg-t { fill:var(--ink); font-family:var(--sans); font-size:12px; }
+  .dg-t-sm { fill:var(--muted); font-family:var(--sans); font-size:10.5px; }
+  .dg-t-acc { fill:var(--accent-ink); font-family:var(--sans); font-size:11px; font-weight:700; }
+  .dg-line { stroke:currentColor; stroke-width:1.2; fill:none; }
+  .dg-line-acc { stroke:var(--accent); stroke-width:1.8; fill:none; }
+  .dg-line-dim { stroke:currentColor; stroke-width:1.1; fill:none; stroke-dasharray:4 3; opacity:.55; }
+  .dg-head { fill:currentColor; }
+  .dg-head-acc { fill:var(--accent); }
+
+  /* 表 */
+  .tablewrap { overflow-x:auto; border:1px solid var(--rule); border-radius:8px; }
+  table { border-collapse:collapse; width:100%; min-width:38rem; font-size:.87rem; background:var(--card); }
+  th,td { text-align:left; padding:.65rem .8rem; border-bottom:1px solid var(--rule-soft); vertical-align:top; line-height:1.65; }
+  thead th { font-size:.68rem; letter-spacing:.12em; text-transform:uppercase; color:var(--accent-ink); font-weight:700; background:var(--accent-bg); border-bottom:1px solid var(--rule); }
+  tbody tr:last-child td { border-bottom:none; }
+  td.spec { color:var(--muted); }
+
+  .tag { display:inline-block; font-size:.68rem; font-weight:700; letter-spacing:.06em; padding:.12em .5em; border-radius:3px; white-space:nowrap; }
+  .tag-chg { color:var(--accent-ink); background:var(--accent-bg); border:1px solid var(--accent); }
+  .tag-add { color:var(--add); background:var(--add-bg); border:1px solid var(--add-rule); }
+  .tag-non { color:var(--warn); background:var(--warn-bg); border:1px solid var(--warn-rule); }
+
+  .note,.warn { border-radius:8px; padding:.95rem 1.1rem; display:flex; flex-direction:column; gap:.45rem; font-size:.9rem; line-height:1.75; }
+  .note { background:var(--accent-bg); border:1px solid var(--rule); border-left:3px solid var(--accent); }
+  .warn { background:var(--warn-bg); border:1px solid var(--warn-rule); border-left:3px solid var(--warn); }
+  .note .hd,.warn .hd { font-size:.68rem; letter-spacing:.16em; text-transform:uppercase; font-weight:700; }
+  .note .hd { color:var(--accent-ink); } .warn .hd { color:var(--warn); }
+  .note p,.warn p { color:var(--ink-soft); }
+
+  ul.plain { margin:0; padding-left:1.2rem; display:flex; flex-direction:column; gap:.5rem; font-size:.93rem; }
+
+  footer { border-top:1px solid var(--rule); padding-top:1.3rem; color:var(--muted); font-size:.82rem; display:flex; flex-direction:column; gap:.3rem; }
+
+  @media print {
+    body { background:#fff; }
+    .wrap { padding:0; gap:2.2rem; max-width:none; }
+    section { break-inside:avoid-page; }
+    figure { break-inside:avoid-page; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="wordmark">THE CONCIERGE</div>
+    <div class="hairline"></div>
+    <h1>実装差分・アーキテクチャ説明書</h1>
+    <p class="meta">
+      対象実装：2026年8月10日時点のデプロイ済みバージョン<br>
+      対照した仕様書：「にゃんこ秘書AI 要件定義書 v3.2」（共通基盤）／「THE CONCIERGE 要件定義書 v1.0」（ブランド・画面）
+    </p>
+  </header>
+
+  <div class="summary">
+    <h2 style="font-family:var(--serif);font-size:1.15rem;letter-spacing:.05em;margin:0;">先に押さえるべき4点</h2>
+    <ol>
+      <li><strong>Dify を採用せず、FastAPI から Claude を直接呼んでいます。</strong>仕様書 v3.1／v3.2 の中核だった会話基盤 Dify を挟まず、v3.0 相当の構成に戻しました。仕様書 §17-2 が「撤退時の代替実装」として用意していた形を、最初から採っています。</li>
+      <li><strong>OAuthトークンをサーバー側（Supabase）に保存しています。</strong>仕様書の設計制約「トークンはデバイスのセキュアストレージに保存し、サーバーに保存しないこと」から外れる、意図的な変更です。理由と代替策は後述します。</li>
+      <li><strong>朝のブリーフィングとリマインダーは、サーバー発の通知になっていません。</strong>いずれもアプリを開いている間に動く仕組みです。仕様書が前提とする Cron ＋プッシュ通知は未実装です。</li>
+      <li><strong>仕様書に無い機能を4つ追加しています。</strong>候補枠の仮押さえ、1プロバイダ内での複数カレンダー指定、重複予定の統合表示、予定検索ツールです。</li>
+    </ol>
+  </div>
+
+  <!-- ============ アーキテクチャ ============ -->
+  <section>
+    <div class="eyebrow">Architecture</div>
+    <h2>いま動いている構成</h2>
+
+    <figure>
+      <div class="figbox">
+        <svg viewBox="0 0 700 340" role="img" aria-label="仕様書の構成では Dify が会話層として別ホストに存在し、ツール実行のたびに FastAPI へネットワーク往復が発生する。実装では Dify を除き、FastAPI が Claude を直接呼んでツールはプロセス内関数として実行するため、その往復が消えている。">
+          <defs>
+            <marker id="ah" viewBox="0 0 10 8" refX="9" refY="4" markerWidth="8" markerHeight="7" orient="auto">
+              <polygon points="0,0 10,4 0,8" class="dg-head"/>
+            </marker>
+            <marker id="ahA" viewBox="0 0 10 8" refX="9" refY="4" markerWidth="8" markerHeight="7" orient="auto">
+              <polygon points="0,0 10,4 0,8" class="dg-head-acc"/>
+            </marker>
+          </defs>
+
+          <!-- 見出し -->
+          <text x="150" y="18" class="dg-t-sm" text-anchor="middle">仕様書 v3.1 / v3.2</text>
+          <text x="530" y="18" class="dg-t-acc" text-anchor="middle">実装（デプロイ済み）</text>
+          <line x1="340" y1="28" x2="340" y2="320" class="dg-line-dim"/>
+
+          <!-- ===== 左：仕様書 ===== -->
+          <rect x="70" y="32" width="160" height="30" rx="5" class="dg-box"/>
+          <text x="150" y="52" class="dg-t" text-anchor="middle">PWA</text>
+
+          <line x1="150" y1="62" x2="150" y2="84" class="dg-line" marker-end="url(#ah)"/>
+
+          <rect x="50" y="88" width="200" height="52" rx="5" class="dg-box"/>
+          <text x="150" y="106" class="dg-t" text-anchor="middle">FastAPI</text>
+          <text x="150" y="122" class="dg-t-sm" text-anchor="middle">/api/chat は転送するだけ</text>
+          <text x="150" y="134" class="dg-t-sm" text-anchor="middle">ツールは HTTP で公開</text>
+
+          <line x1="120" y1="140" x2="120" y2="168" class="dg-line" marker-end="url(#ah)"/>
+          <text x="112" y="157" class="dg-t-sm" text-anchor="end">転送</text>
+
+          <rect x="50" y="172" width="200" height="46" rx="5" class="dg-box"/>
+          <text x="150" y="190" class="dg-t" text-anchor="middle">Dify Self-Hosted</text>
+          <text x="150" y="205" class="dg-t-sm" text-anchor="middle">Hetzner・会話とツール定義</text>
+
+          <!-- Difyからツールを呼び戻す往復（これが消える） -->
+          <path d="M250 195 C 296 195, 296 150, 254 150" class="dg-line" marker-end="url(#ah)"/>
+          <text x="304" y="176" class="dg-t-sm" text-anchor="middle">ツール</text>
+          <text x="304" y="188" class="dg-t-sm" text-anchor="middle">呼び戻し</text>
+
+          <line x1="150" y1="218" x2="150" y2="244" class="dg-line" marker-end="url(#ah)"/>
+          <rect x="70" y="248" width="160" height="30" rx="5" class="dg-box"/>
+          <text x="150" y="268" class="dg-t" text-anchor="middle">Claude API</text>
+
+          <!-- ===== 右：実装 ===== -->
+          <rect x="450" y="32" width="160" height="30" rx="5" class="dg-box"/>
+          <text x="530" y="52" class="dg-t" text-anchor="middle">PWA（Vercel）</text>
+
+          <line x1="530" y1="62" x2="530" y2="84" class="dg-line-acc" marker-end="url(#ahA)"/>
+          <text x="538" y="77" class="dg-t-sm">SSE</text>
+
+          <rect x="430" y="88" width="200" height="66" rx="5" class="dg-box-acc"/>
+          <text x="530" y="107" class="dg-t" text-anchor="middle">FastAPI（Render）</text>
+          <text x="530" y="123" class="dg-t-sm" text-anchor="middle">Anthropic SDK を直接呼ぶ</text>
+          <text x="530" y="136" class="dg-t-sm" text-anchor="middle">ツールは同一プロセス内の</text>
+          <text x="530" y="148" class="dg-t-sm" text-anchor="middle">関数（HTTP公開なし）</text>
+
+          <!-- Difyの抜けた場所 -->
+          <rect x="430" y="172" width="200" height="46" rx="5" class="dg-box-dim"/>
+          <text x="530" y="194" class="dg-t-sm" text-anchor="middle">（Dify なし）</text>
+          <text x="530" y="208" class="dg-t-sm" text-anchor="middle">Hetzner も不要</text>
+
+          <line x1="530" y1="154" x2="530" y2="244" class="dg-line-acc" marker-end="url(#ahA)"/>
+
+          <rect x="450" y="248" width="160" height="30" rx="5" class="dg-box"/>
+          <text x="530" y="268" class="dg-t" text-anchor="middle">Claude API</text>
+
+          <text x="530" y="300" class="dg-t-sm" text-anchor="middle">ネットワーク往復が1層ぶん減り、</text>
+          <text x="530" y="314" class="dg-t-sm" text-anchor="middle">運用対象サーバーも1台減っている</text>
+        </svg>
+      </div>
+      <figcaption>図1　仕様書の構成では、Claude がツールを使うたびに Dify から FastAPI へネットワーク往復が発生し、Dify 用のサーバー（Hetzner）も別途必要でした。実装ではその層ごと取り除いています。</figcaption>
+    </figure>
+
+    <p>失ったものもあります。Dify の管理画面でプロンプトやツール定義を編集する運用、会話履歴の二重保存、そして「会話層だけ差し替えられる」撤退のしやすさです。現在プロンプトは <code>app/routers/chat.py</code> に、ツール定義は <code>app/tools.py</code> に直接書かれており、変更にはデプロイが必要です。</p>
+
+    <figure>
+      <div class="figbox">
+        <svg viewBox="0 0 700 300" role="img" aria-label="チャット1往復の流れ。PWAからFastAPIへ送られたメッセージがClaudeへ渡り、Claudeがツール使用を要求するとFastAPIが同一プロセス内でカレンダーAPIやSupabaseを呼び、結果を返してClaudeが再度応答する。生成文はその間ずっとSSEでPWAへ流れ続ける。">
+          <defs>
+            <marker id="ah2" viewBox="0 0 10 8" refX="9" refY="4" markerWidth="8" markerHeight="7" orient="auto">
+              <polygon points="0,0 10,4 0,8" class="dg-head"/>
+            </marker>
+            <marker id="ahA2" viewBox="0 0 10 8" refX="9" refY="4" markerWidth="8" markerHeight="7" orient="auto">
+              <polygon points="0,0 10,4 0,8" class="dg-head-acc"/>
+            </marker>
+          </defs>
+
+          <!-- 縦レーン -->
+          <rect x="20" y="24" width="120" height="34" rx="5" class="dg-box"/>
+          <text x="80" y="46" class="dg-t" text-anchor="middle">PWA</text>
+
+          <rect x="240" y="24" width="150" height="34" rx="5" class="dg-box-acc"/>
+          <text x="315" y="46" class="dg-t" text-anchor="middle">FastAPI</text>
+
+          <rect x="500" y="24" width="150" height="34" rx="5" class="dg-box"/>
+          <text x="575" y="46" class="dg-t" text-anchor="middle">Claude</text>
+
+          <line x1="80" y1="58" x2="80" y2="270" class="dg-line-dim"/>
+          <line x1="315" y1="58" x2="315" y2="270" class="dg-line-dim"/>
+          <line x1="575" y1="58" x2="575" y2="270" class="dg-line-dim"/>
+
+          <!-- 1 送信 -->
+          <line x1="80" y1="82" x2="309" y2="82" class="dg-line" marker-end="url(#ah2)"/>
+          <text x="195" y="76" class="dg-t-sm" text-anchor="middle">ご指示（テキスト／音声認識結果）</text>
+
+          <!-- 2 Claudeへ -->
+          <line x1="315" y1="106" x2="569" y2="106" class="dg-line" marker-end="url(#ah2)"/>
+          <text x="442" y="100" class="dg-t-sm" text-anchor="middle">会話履歴＋ツール定義</text>
+
+          <!-- 3 tool_use -->
+          <line x1="575" y1="134" x2="321" y2="134" class="dg-line" marker-end="url(#ah2)"/>
+          <text x="448" y="128" class="dg-t-sm" text-anchor="middle">「空き時間を調べて」（tool_use）</text>
+
+          <!-- 4 外部呼び出し -->
+          <path d="M315 158 C 250 158, 250 196, 313 196" class="dg-line" marker-end="url(#ah2)"/>
+          <rect x="120" y="160" width="180" height="34" rx="5" class="dg-box"/>
+          <text x="210" y="181" class="dg-t-sm" text-anchor="middle">Google Calendar API／Supabase</text>
+          <text x="210" y="212" class="dg-t-sm" text-anchor="middle">プロセス内の関数として実行</text>
+
+          <!-- 5 結果を戻す -->
+          <line x1="315" y1="228" x2="569" y2="228" class="dg-line" marker-end="url(#ah2)"/>
+          <text x="442" y="222" class="dg-t-sm" text-anchor="middle">ツール結果を返して再度依頼</text>
+
+          <!-- SSE -->
+          <path d="M309 258 L 86 258" class="dg-line-acc" marker-end="url(#ahA2)"/>
+          <text x="197" y="252" class="dg-t-acc" text-anchor="middle">生成文をSSEで随時流す（待たせない）</text>
+
+          <text x="660" y="150" class="dg-t-sm" text-anchor="end">③〜⑤は最大5回まで繰り返す</text>
+        </svg>
+      </div>
+      <figcaption>図2　チャット1往復の内部。Claude がツールを要求するたびに FastAPI が同一プロセス内で実行し、結果を返して続きを生成させます。文章は完成を待たず、生成しながら画面へ流しています。</figcaption>
+    </figure>
+
+    <h3>デプロイ先</h3>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>層</th><th>仕様書</th><th>実装</th></tr></thead>
+        <tbody>
+          <tr><td>フロント（PWA）</td><td class="spec">Vercel（THE CONCIERGE §11-1）</td><td>Vercel</td></tr>
+          <tr><td>バックエンド</td><td class="spec">Render / Railway の無料枠</td><td>Render <strong>Starter（$7/月）</strong>。無料枠は15分で停止し初回応答が遅いため変更</td></tr>
+          <tr><td>会話基盤</td><td class="spec">Dify Self-Hosted（Hetzner CX21・¥1,000/月）</td><td><strong>なし</strong></td></tr>
+          <tr><td>DB</td><td class="spec">Supabase</td><td>Supabase（同じ）</td></tr>
+          <tr><td>モデル</td><td class="spec">Claude Sonnet 4.6</td><td><code>claude-sonnet-5</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ 認証まわり ============ -->
+  <section>
+    <div class="eyebrow">Difference — 認証・セキュリティ</div>
+    <h2>トークンの置き場所を変えています</h2>
+
+    <div class="warn">
+      <span class="hd">仕様書の制約から外れている箇所</span>
+      <p>両仕様書の「重要な設計制約」には<strong>「OAuth トークンはデバイスのセキュアストレージに保存し、サーバーに保存しないこと」</strong>とあります。実装では、Google から受け取ったアクセストークンとリフレッシュトークンを <strong>Supabase の <code>oauth_tokens</code> テーブルに保存</strong>しています。</p>
+    </div>
+
+    <p>変更した理由は2つあります。ひとつは、仕様書が想定していた Keychain／Keystore が <strong>PWA には存在しない</strong>こと。ブラウザで使える保管場所は localStorage 程度で、そこにリフレッシュトークンを置くほうが危険です。もうひとつは、朝のブリーフィングのようにユーザーが端末を開いていないときに動く処理を将来入れるなら、サーバーがトークンを持っていない限り実現できないことです。</p>
+
+    <p>そのうえで、次の形にしています。</p>
+    <ul class="plain">
+      <li>OAuth はサーバー側で完結する方式（認可コードフロー）にし、<strong>クライアントシークレットをブラウザに一切渡していません</strong></li>
+      <li>ブラウザが持つのは自前発行の<strong>セッショントークン（JWT・有効期限30日）だけ</strong>で、これがあってもカレンダーには直接アクセスできません</li>
+      <li>全テーブルで Row Level Security を有効化済み</li>
+    </ul>
+
+    <div class="note">
+      <span class="hd">ただし、RLSは現時点では保険にとどまります</span>
+      <p>バックエンドは service_role キーで接続しているため RLS は実質バイパスされます。実際のユーザー分離は、全クエリに <code>user_id</code> の条件を必ず付けるというアプリ側の実装で担保しています。RLS が実効的な防御になるのは、将来フロントから Supabase を直接呼ぶ経路を作った場合です。仕様書 §22 のチェックリスト「全テーブルで RLS を有効化」は形式上満たしていますが、実態はこの通りである点をご認識ください。</p>
+    </div>
+
+    <p>なお、仕様書には<strong>アプリ内のユーザー識別の設計そのものがありません</strong>（単一ユーザー前提の記述になっています）。実装では <code>users</code>／<code>user_identities</code>／<code>oauth_tokens</code> の3テーブルを追加し、同じメールアドレスの Google と Outlook を1人のユーザーに統合できる構造にしました。これは以前ご相談した「§10-4 マルチユーザー対応」の内容ですが、<strong>仕様書側にはまだ反映されていません</strong>（Drive上の要件定義書の最終更新は2026年5月11日のままです）。</p>
+  </section>
+
+  <!-- ============ 差分表 ============ -->
+  <section>
+    <div class="eyebrow">Difference — 機能とデータ</div>
+    <h2>仕様書との差分一覧</h2>
+    <p style="color:var(--muted);font-size:.9rem;">
+      <span class="tag tag-chg">変更</span> 仕様と違う作りにした
+      <span class="tag tag-add">追加</span> 仕様に無いものを足した
+      <span class="tag tag-non">未実装</span> 仕様にあるが入っていない
+    </p>
+
+    <h3>Claude が使えるツール</h3>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>ツール</th><th>区分</th><th>内容</th></tr></thead>
+        <tbody>
+          <tr><td><code>get_free_slots</code></td><td>—</td><td>仕様どおり。Google と Outlook を並列取得。3件見つけ次第打ち切るため、どこまで調べたかを結果に含めています</td></tr>
+          <tr><td><code>create_event</code></td><td><span class="tag tag-chg">変更</span></td><td>選択された<strong>全登録先カレンダーに同時登録</strong>するため、戻り値が単数から配列になっています</td></tr>
+          <tr><td><code>reschedule_event</code></td><td><span class="tag tag-chg">変更</span></td><td>同じ予定が複数カレンダーにある場合、<strong>全コピーを同時に動かします</strong></td></tr>
+          <tr><td><code>judge_memo_importance</code></td><td><span class="tag tag-chg">変更</span></td><td><strong>キーワード一致による判定</strong>です。仕様書の制約「毎回 Claude に判断させること」を満たしていません（下記参照）</td></tr>
+          <tr><td><code>find_events</code></td><td><span class="tag tag-add">追加</span></td><td>既存予定を検索して <code>event_id</code> を得るツール。仕様書 UC-5 は「find_event → reschedule_event」と書いていましたが §17 のツール一覧に無く、これが無いと予定変更が成立しないため追加しました</td></tr>
+          <tr><td><code>create_task</code></td><td><span class="tag tag-add">追加</span></td><td>会話からタスクを登録。時刻を伴う予定は <code>create_event</code>、期限だけのやることは <code>create_task</code> と使い分けさせています</td></tr>
+          <tr><td><code>get_travel_time</code></td><td><span class="tag tag-non">未実装</span></td><td>Phase 2 の予定どおり未着手</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="warn">
+      <span class="hd">メモ重要度判定について</span>
+      <p>仕様書は「メモ全文を Claude に判定させる」と定めていますが、実装は「持っていく・準備・印刷・提出・締め切り」など<strong>7語のキーワード一致</strong>で判定しています。判定のたびに Claude を呼ぶコストと遅延を避けた形ですが、仕様どおりの精度は出ません。Phase 1 の検証で「重要判定が当たらない」という声が出たら、ここを差し替える想定です。</p>
+    </div>
+
+    <h3>データ設計（Supabase）</h3>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>テーブル／カラム</th><th>区分</th><th>内容</th></tr></thead>
+        <tbody>
+          <tr><td><code>events</code> / <code>tasks</code></td><td>—</td><td>仕様書 §16 どおり</td></tr>
+          <tr><td><code>messages.dify_session_id</code></td><td><span class="tag tag-non">未実装</span></td><td>Dify を使わないため不要になり、カラムごと落としています</td></tr>
+          <tr><td><code>users</code>, <code>user_identities</code></td><td><span class="tag tag-add">追加</span></td><td>マルチユーザー識別。同一メールの Google／Outlook を1人に統合</td></tr>
+          <tr><td><code>oauth_tokens</code></td><td><span class="tag tag-add">追加</span></td><td>ユーザー×プロバイダごとのトークン。期限切れは自動リフレッシュ</td></tr>
+          <tr><td><code>oauth_tokens.selected_calendar_ids</code></td><td><span class="tag tag-add">追加</span></td><td>空き時間チェックの対象カレンダー（最大3件）</td></tr>
+          <tr><td><code>oauth_tokens.write_calendar_ids</code></td><td><span class="tag tag-add">追加</span></td><td>新規予定の登録先（最大3件・同時登録）</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>仕様書に無い、追加した機能</h3>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>機能</th><th>追加した理由</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>候補枠の仮押さえ</strong></td>
+            <td>候補日を相手に送ってから返事が来るまでの間に、別の予定で埋まってしまう問題への対処。候補すべてを「［仮］」付きで実カレンダーに入れ、本確定すると残りを自動削除します</td>
+          </tr>
+          <tr>
+            <td><strong>1アカウント内の複数カレンダー指定</strong></td>
+            <td>仕様書は「Google か Outlook か」の粒度しか想定していませんでしたが、実際には1つのGoogleアカウントに仕事用・個人用・共有カレンダーが同居します。参照用と登録先を別々に、各最大3件まで選べるようにしました</td>
+          </tr>
+          <tr>
+            <td><strong>重複予定の統合表示</strong></td>
+            <td>上記で3カレンダーに登録すると予定一覧に同じ予定が3件並び、リマインダーも3回鳴っていました。件名・開始・終了が一致するものを1件にまとめています</td>
+          </tr>
+          <tr>
+            <td><strong>未連携カレンダーのボタン無効化</strong></td>
+            <td>連携していないカレンダーへの登録ボタンが押せてしまい、押すと必ず失敗する状態だったため</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>仕様にあるが、まだ入っていないもの</h3>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>項目</th><th>仕様書の記述</th><th>現状</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>朝のブリーフィング配信</td>
+            <td class="spec">毎朝7時に Cron が起動しプッシュ通知を送る（UC-1）</td>
+            <td>データを返す <code>GET /api/briefing</code> はありますが、<strong>Cron もプッシュ通知もありません</strong>。アプリを開いたときに当日分を表示するだけです</td>
+          </tr>
+          <tr>
+            <td>フラッシュリマインダー</td>
+            <td class="spec">予定のX分前に通知（UC-7）</td>
+            <td>アプリを開いている間だけ20秒ごとに判定して表示します。閉じている間は鳴りません。代わりに、リマインダーON中は画面が自動消灯しないようにしています</td>
+          </tr>
+          <tr>
+            <td>オフライン対応</td>
+            <td class="spec">15〜30分ごとの背景同期、暫定データバナー、オフライン中の登録キュー（§8）</td>
+            <td>いずれも未実装</td>
+          </tr>
+          <tr>
+            <td>キャッシュ優先参照</td>
+            <td class="spec">カレンダーAPIより先に Supabase を参照する（§6-3）</td>
+            <td>毎回カレンダーAPIを直接見ています。<code>events</code> テーブルは書き込み時の記録用にとどまります</td>
+          </tr>
+          <tr>
+            <td>プロンプトキャッシング</td>
+            <td class="spec">システムプロンプトとツール定義を再利用してコスト削減（§7-2）</td>
+            <td>未実装。有効化すればAPI費用を下げられる余地があります</td>
+          </tr>
+          <tr>
+            <td>Whisper 音声認識</td>
+            <td class="spec"><code>POST /api/voice</code>（Web Speech 非対応ブラウザ向け）</td>
+            <td>未実装。ブラウザの Web Speech API のみ対応です</td>
+          </tr>
+          <tr>
+            <td>Outlook 連携</td>
+            <td class="spec">Microsoft Graph でGoogleと同等に扱う</td>
+            <td>コードは実装済みですが、<strong>Azure 側の設定が未完のため未稼働</strong>です</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ エンドポイント ============ -->
+  <section>
+    <div class="eyebrow">Difference — API</div>
+    <h2>エンドポイントの構成</h2>
+    <p>仕様書 §17 はツールを <code>POST /api/tools/*</code> として外部公開する前提でした。これは Dify から呼び戻すためのもので、Dify を外した実装では<strong>ツールは HTTP エンドポイントではなく、単なる Python 関数</strong>になっています。認証・OAuth もリダイレクト方式に変わりました。</p>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>エンドポイント</th><th>区分</th><th>備考</th></tr></thead>
+        <tbody>
+          <tr><td><code>POST /api/chat</code></td><td><span class="tag tag-chg">変更</span></td><td>Dify転送ではなく、Claude を直接呼んで SSE で返します</td></tr>
+          <tr><td><code>DELETE /api/chat/history</code></td><td><span class="tag tag-add">追加</span></td><td>会話リセット時に Claude へ渡す文脈も消すため</td></tr>
+          <tr><td><code>POST /api/tools/*</code>（4本）</td><td><span class="tag tag-chg">変更</span></td><td>廃止。プロセス内関数に置き換え</td></tr>
+          <tr><td><code>GET /api/auth/{provider}/login</code><br><code>GET /api/auth/{provider}/callback</code></td><td><span class="tag tag-chg">変更</span></td><td>仕様書は <code>POST /api/auth/google</code> でしたが、ブラウザのリダイレクトを伴うため GET 2本構成に</td></tr>
+          <tr><td><code>GET /api/events</code></td><td><span class="tag tag-add">追加</span></td><td>スケジュール画面用の予定一覧（重複統合済み）</td></tr>
+          <tr><td><code>POST /api/events</code></td><td><span class="tag tag-add">追加</span></td><td>候補枠の確定登録。会話を介さずボタン操作から直接登録します</td></tr>
+          <tr><td><code>POST /api/events/tentative</code><br><code>POST /api/events/tentative/release</code></td><td><span class="tag tag-add">追加</span></td><td>仮押さえの作成と解除</td></tr>
+          <tr><td><code>GET /api/calendars</code><br><code>PUT /api/calendars/{provider}/selection</code></td><td><span class="tag tag-add">追加</span></td><td>カレンダー一覧の取得と、参照・登録先の選択</td></tr>
+          <tr><td><code>PATCH /api/tasks/{id}</code><br><code>DELETE /api/tasks/{id}</code></td><td><span class="tag tag-add">追加</span></td><td>タスクの編集・削除</td></tr>
+          <tr><td><code>POST /api/voice</code></td><td><span class="tag tag-non">未実装</span></td><td>Whisper 未対応</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ 仕様書側の更新 ============ -->
+  <section>
+    <div class="eyebrow">Next</div>
+    <h2>仕様書側で更新したほうがよい箇所</h2>
+    <p>実装が動いている以上、仕様書のほうが現実と食い違っている状態です。外部審査や法人商談で仕様書を出す場面を考えると、少なくとも次の5点は書き換えておく価値があります。</p>
+    <ul class="plain">
+      <li><strong>§6 アーキテクチャ</strong>— Dify を前提とした構成図とバージョン変遷表。実装は v3.0 相当に戻っています</li>
+      <li><strong>§9・§12・§13 技術スタックとコスト</strong>— Dify と Hetzner が不要になり、その分 Render が有料（$7/月）に変わりました</li>
+      <li><strong>重要な設計制約（付録）</strong>— 「トークンをサーバーに保存しない」「メモ判定は毎回 Claude」の2点が、現在の実装と矛盾しています</li>
+      <li><strong>§10 認証</strong>— マルチユーザー対応（§10-4 として作成済みの原稿）がまだ貼り込まれていません</li>
+      <li><strong>§16 テーブル設計</strong>— <code>users</code>／<code>user_identities</code>／<code>oauth_tokens</code> の3テーブルが未記載です</li>
+    </ul>
+    <div class="note">
+      <span class="hd">補足</span>
+      <p>仮押さえ・複数カレンダー登録・重複統合の3機能は、仕様書のどのフェーズにも記載がない純粋な追加です。Phase 1 の機能一覧に足しておくと、テスト結果を投資家や法人に説明する際に話が通りやすくなります。</p>
+    </div>
+  </section>
+
+  <footer>
+    <div>THE CONCIERGE ／ 実装差分・アーキテクチャ説明書</div>
+    <div>作成日: 2026年8月10日　対象コミット: main ブランチ最新（Vercel／Render にデプロイ済み）</div>
+  </footer>
+
+</div>
