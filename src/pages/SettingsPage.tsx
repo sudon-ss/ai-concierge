@@ -1,11 +1,94 @@
+import { useState } from 'react'
 import clsx from 'clsx'
-import { Bell, Calendar as CalIcon, Clock, Sparkles, UserCog, RefreshCw } from 'lucide-react'
+import { Bell, BellRing, Calendar as CalIcon, Clock, Sparkles, UserCog, RefreshCw } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { ProfileSelector } from '../components/ProfileSelector'
 import { CalendarSelector } from '../components/CalendarSelector'
 import { useSettings, BRIEFING_TIME_OPTIONS, formatBriefingTime } from '../hooks/useSettings'
 import { useCalendarsData } from '../hooks/useCalendarsData'
+import { usePushNotifications } from '../hooks/usePushNotifications'
 import { googleLoginUrl, outlookLoginUrl, clearSession } from '../lib/api'
+
+/** アプリを閉じている間もお知らせを受け取るための設定 */
+function PushSection() {
+  const { state, busy, enable, disable, test } = usePushNotifications()
+  const [msg, setMsg] = useState<string | null>(null)
+
+  const onEnable = async () => {
+    setMsg(null)
+    const res = await enable()
+    setMsg(res.ok ? '通知を有効にいたしました' : (res.message ?? '設定に失敗しました'))
+  }
+
+  const onTest = async () => {
+    setMsg(null)
+    try {
+      setMsg((await test()) ? 'テスト通知をお送りしました' : '送信できませんでした')
+    } catch {
+      setMsg('送信できませんでした')
+    }
+  }
+
+  return (
+    <div className="py-3 space-y-2">
+      <div className="flex items-start gap-3">
+        <div className="flex-1">
+          <p className="text-sm font-medium text-navy-900">端末へのお知らせ</p>
+          <p className="text-xs text-navy-500 mt-0.5">
+            {state === 'on'
+              ? 'アプリを閉じている間もお届けいたします'
+              : 'アプリを閉じている間もお届けするには設定が必要です'}
+          </p>
+        </div>
+        {state === 'on' ? (
+          <button
+            type="button"
+            onClick={disable}
+            disabled={busy}
+            className="shrink-0 text-xs font-semibold rounded-md px-3 py-1.5 bg-gold-500 text-navy-900 hover:bg-gold-600 disabled:opacity-40"
+          >
+            有効
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onEnable}
+            disabled={busy || state === 'needs-install' || state === 'unsupported' || state === 'denied'}
+            className="shrink-0 inline-flex items-center gap-1 text-xs font-semibold rounded-md px-3 py-1.5 btn-secondary disabled:opacity-40"
+          >
+            <BellRing size={12} /> 有効にする
+          </button>
+        )}
+      </div>
+
+      {state === 'needs-install' && (
+        <p className="text-xs text-gold-700 leading-relaxed">
+          iPhoneでお知らせを受け取るには、Safariの共有ボタンから「ホーム画面に追加」を行い、
+          追加されたアイコンから開いてこの設定をお願いいたします。
+        </p>
+      )}
+      {state === 'denied' && (
+        <p className="text-xs text-gold-700 leading-relaxed">
+          通知がブロックされております。端末の設定からこのアプリの通知を許可してくださいませ。
+        </p>
+      )}
+      {state === 'unsupported' && (
+        <p className="text-xs text-navy-500">このブラウザは端末へのお知らせに対応しておりません。</p>
+      )}
+
+      {state === 'on' && (
+        <button
+          type="button"
+          onClick={onTest}
+          className="text-xs text-navy-500 hover:text-gold-600 underline-offset-2 hover:underline"
+        >
+          テスト通知を送る
+        </button>
+      )}
+      {msg && <p className="text-xs text-navy-600">{msg}</p>}
+    </div>
+  )
+}
 
 interface ToggleProps {
   label: string
@@ -214,6 +297,7 @@ export function SettingsPage() {
             <option value={60}>1時間前</option>
           </select>
         </div>
+        <PushSection />
       </section>
 
       <section className="card p-4">

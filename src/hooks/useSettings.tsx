@@ -1,5 +1,15 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
 import { getStorageItem, setStorageItem, STORAGE_KEYS } from '../lib/storage'
+import { getSession, hasBackend, putServerSettings } from '../lib/api'
 
 export interface AppSettings {
   briefingTime: string // "HH:MM" 24h
@@ -65,6 +75,28 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setStorageItem(STORAGE_KEYS.settings, settings)
   }, [settings])
+
+  // 通知まわりの設定はサーバー側の配信ジョブも参照するため、端末だけでなくDBにも反映する。
+  // 初回マウント時は送らない（サーバーの値を端末の初期値で上書きしないため）。
+  const syncedOnce = useRef(false)
+  useEffect(() => {
+    if (!hasBackend() || !getSession()) return
+    if (!syncedOnce.current) {
+      syncedOnce.current = true
+      return
+    }
+    putServerSettings({
+      briefing_enabled: settings.briefingEnabled,
+      briefing_time: settings.briefingTime,
+      notification_enabled: settings.notificationEnabled,
+      reminder_minutes: settings.reminderMinutes,
+    }).catch(() => {})
+  }, [
+    settings.briefingEnabled,
+    settings.briefingTime,
+    settings.notificationEnabled,
+    settings.reminderMinutes,
+  ])
 
   useEffect(() => {
     setStorageItem(STORAGE_KEYS.onboarded, onboarded)

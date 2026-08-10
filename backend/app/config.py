@@ -22,5 +22,14 @@ class Settings(BaseSettings):
 
     frontend_origin: str = "http://localhost:5173"
 
+    # Web Push（リマインダー・朝のブリーフィングの配信）
+    vapid_public_key: str = ""
+    vapid_private_key: str = ""
+    vapid_subject: str = "mailto:support@example.com"
+
+    # 配信ジョブのエンドポイントを外部Cronから叩くための共有シークレット。
+    # 未設定のままだとジョブを誰でも起動できてしまうため、空なら実行を拒否する
+    cron_secret: str = ""
+
 
 settings = Settings()

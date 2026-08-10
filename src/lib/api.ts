@@ -279,6 +279,43 @@ export function releaseTentativeSlots(items: TentativeRef[]): Promise<{ deleted:
   })
 }
 
+/* ---------- プッシュ通知・サーバー側の通知設定 ---------- */
+
+/** サーバー側に保存する通知設定。配信ジョブがこれを見て送信する */
+export interface ServerSettings {
+  briefing_enabled: boolean
+  briefing_time: string
+  notification_enabled: boolean
+  reminder_minutes: number
+}
+
+export function getServerSettings(): Promise<ServerSettings> {
+  return apiFetch<ServerSettings>('/api/settings')
+}
+
+export function putServerSettings(patch: Partial<ServerSettings>): Promise<ServerSettings> {
+  return apiFetch<ServerSettings>('/api/settings', { method: 'PUT', body: JSON.stringify(patch) })
+}
+
+export function getPushPublicKey(): Promise<{ publicKey: string; configured: boolean }> {
+  return apiFetch<{ publicKey: string; configured: boolean }>('/api/push/public-key')
+}
+
+export function subscribePush(sub: { endpoint: string; p256dh: string; auth: string }) {
+  return apiFetch<{ ok: boolean }>('/api/push/subscribe', { method: 'POST', body: JSON.stringify(sub) })
+}
+
+export function unsubscribePush(endpoint: string) {
+  return apiFetch<{ ok: boolean }>('/api/push/unsubscribe', {
+    method: 'POST',
+    body: JSON.stringify({ endpoint }),
+  })
+}
+
+export function sendTestPush() {
+  return apiFetch<{ sent: number }>('/api/push/test', { method: 'POST' })
+}
+
 export interface CalendarOption {
   id: string
   name: string

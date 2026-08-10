@@ -28,6 +28,7 @@ __pycache__
 credentials.json
 *.pem
 *.key
+.vapid_generated
 *.p12
 *.pfx
 secrets.json
