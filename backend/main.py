@@ -1,6 +1,11 @@
+import asyncio
+import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app import scheduler
 from app.config import settings
 from app.routers import (
     auth_google,
@@ -13,7 +18,21 @@ from app.routers import (
     tasks,
 )
 
-app = FastAPI(title="THE CONCIERGE API")
+logging.basicConfig(level=logging.INFO)
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    """リマインダー・ブリーフィングの配信ループをアプリと一緒に動かす。"""
+    task: asyncio.Task | None = None
+    if scheduler.should_run():
+        task = asyncio.create_task(scheduler.run_forever())
+    yield
+    if task:
+        task.cancel()
+
+
+app = FastAPI(title="THE CONCIERGE API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

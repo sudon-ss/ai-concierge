@@ -124,7 +124,7 @@
     <ol>
       <li><strong>Dify を採用せず、FastAPI から Claude を直接呼んでいます。</strong>仕様書 v3.1／v3.2 の中核だった会話基盤 Dify を挟まず、v3.0 相当の構成に戻しました。仕様書 §17-2 が「撤退時の代替実装」として用意していた形を、最初から採っています。</li>
       <li><strong>OAuthトークンをサーバー側（Supabase）に保存しています。</strong>仕様書の設計制約「トークンはデバイスのセキュアストレージに保存し、サーバーに保存しないこと」から外れる、意図的な変更です。理由と代替策は後述します。</li>
-      <li><strong>朝のブリーフィングとリマインダーは、サーバー発の通知になっていません。</strong>いずれもアプリを開いている間に動く仕組みです。仕様書が前提とする Cron ＋プッシュ通知は未実装です。</li>
+      <li><strong>朝のブリーフィングとリマインダーは、サーバーからのプッシュ通知で届きます。</strong>仕様書は Cron サービスを前提にしていましたが、外部Cronは別課金になるため、常時起動しているバックエンド内で5分おきに判定する方式にしています。iPhone は「ホーム画面に追加」が受信条件です。</li>
       <li><strong>仕様書に無い機能を4つ追加しています。</strong>候補枠の仮押さえ、1プロバイダ内での複数カレンダー指定、重複予定の統合表示、予定検索ツールです。</li>
     </ol>
   </div>
@@ -352,6 +352,9 @@
           <tr><td><code>oauth_tokens</code></td><td><span class="tag tag-add">追加</span></td><td>ユーザー×プロバイダごとのトークン。期限切れは自動リフレッシュ</td></tr>
           <tr><td><code>oauth_tokens.selected_calendar_ids</code></td><td><span class="tag tag-add">追加</span></td><td>空き時間チェックの対象カレンダー（最大3件）</td></tr>
           <tr><td><code>oauth_tokens.write_calendar_ids</code></td><td><span class="tag tag-add">追加</span></td><td>新規予定の登録先（最大3件・同時登録）</td></tr>
+          <tr><td><code>user_settings</code></td><td><span class="tag tag-add">追加</span></td><td>通知設定。配信ジョブがサーバー側で判断するため、端末のlocalStorageだけでは足りない</td></tr>
+          <tr><td><code>push_subscriptions</code></td><td><span class="tag tag-add">追加</span></td><td>プッシュ通知の宛先。1ユーザーが複数端末を持てる</td></tr>
+          <tr><td><code>sent_notifications</code></td><td><span class="tag tag-add">追加</span></td><td>二重送信の防止記録。送信前に予約を入れ、重複したら送らない</td></tr>
         </tbody>
       </table>
     </div>
@@ -389,12 +392,12 @@
           <tr>
             <td>朝のブリーフィング配信</td>
             <td class="spec">毎朝7時に Cron が起動しプッシュ通知を送る（UC-1）</td>
-            <td>データを返す <code>GET /api/briefing</code> はありますが、<strong>Cron もプッシュ通知もありません</strong>。アプリを開いたときに当日分を表示するだけです</td>
+            <td><strong>実装済み。</strong>ただし Cron サービスは使わず、常時起動しているバックエンド内で5分おきに判定しています（外部Cronは1本あたり月$1の別課金になるため）。配信時刻はユーザーごとの設定に従います</td>
           </tr>
           <tr>
             <td>フラッシュリマインダー</td>
             <td class="spec">予定のX分前に通知（UC-7）</td>
-            <td>アプリを開いている間だけ20秒ごとに判定して表示します。閉じている間は鳴りません。代わりに、リマインダーON中は画面が自動消灯しないようにしています</td>
+            <td><strong>実装済み。</strong>アプリを閉じていても Web Push で届きます。iPhone は iOS 16.4 以降かつ「ホーム画面に追加」した状態が条件です。アプリを開いている間の画面内フラッシュも従来どおり動きます</td>
           </tr>
           <tr>
             <td>オフライン対応</td>
@@ -445,6 +448,9 @@
           <tr><td><code>POST /api/events/tentative</code><br><code>POST /api/events/tentative/release</code></td><td><span class="tag tag-add">追加</span></td><td>仮押さえの作成と解除</td></tr>
           <tr><td><code>GET /api/calendars</code><br><code>PUT /api/calendars/{provider}/selection</code></td><td><span class="tag tag-add">追加</span></td><td>カレンダー一覧の取得と、参照・登録先の選択</td></tr>
           <tr><td><code>PATCH /api/tasks/{id}</code><br><code>DELETE /api/tasks/{id}</code></td><td><span class="tag tag-add">追加</span></td><td>タスクの編集・削除</td></tr>
+          <tr><td><code>GET /api/push/public-key</code><br><code>POST /api/push/subscribe</code><br><code>POST /api/push/unsubscribe</code><br><code>POST /api/push/test</code></td><td><span class="tag tag-add">追加</span></td><td>プッシュ通知の購読管理と到達テスト</td></tr>
+          <tr><td><code>GET /api/settings</code><br><code>PUT /api/settings</code></td><td><span class="tag tag-add">追加</span></td><td>通知設定。配信ジョブが参照するため端末だけでなくDBにも保持する</td></tr>
+          <tr><td><code>POST /api/jobs/reminders</code><br><code>POST /api/jobs/briefing</code></td><td><span class="tag tag-add">追加</span></td><td>配信ジョブの手動起動。共有シークレット必須。通常はアプリ内のループが回すため任意</td></tr>
           <tr><td><code>POST /api/voice</code></td><td><span class="tag tag-non">未実装</span></td><td>Whisper 未対応</td></tr>
         </tbody>
       </table>
@@ -461,7 +467,9 @@
       <li><strong>§9・§12・§13 技術スタックとコスト</strong>— Dify と Hetzner が不要になり、その分 Render が有料（$7/月）に変わりました</li>
       <li><strong>重要な設計制約（付録）</strong>— 「トークンをサーバーに保存しない」「メモ判定は毎回 Claude」の2点が、現在の実装と矛盾しています</li>
       <li><strong>§10 認証</strong>— マルチユーザー対応（§10-4 として作成済みの原稿）がまだ貼り込まれていません</li>
-      <li><strong>§16 テーブル設計</strong>— <code>users</code>／<code>user_identities</code>／<code>oauth_tokens</code> の3テーブルが未記載です</li>
+      <li><strong>§16 テーブル設計</strong>— <code>users</code>／<code>user_identities</code>／<code>oauth_tokens</code>／<code>user_settings</code>／<code>push_subscriptions</code>／<code>sent_notifications</code> の6テーブルが未記載です</li>
+      <li><strong>§8 オフライン対応</strong>— 「15〜30分ごとのバックグラウンド同期」は Periodic Background Sync API が前提ですが、<strong>これは iOS に存在しません</strong>。iPhoneでは原理的に実現できない要件なので、達成可能な形（キャッシュ表示＋最終更新バナー）へ書き換えが必要です</li>
+      <li><strong>UC-1 / UC-7 の配信方式</strong>— Cron サービス前提の記述を、アプリ内ループ＋Web Push の現行方式に改める。あわせて iOS では「ホーム画面に追加」が受信条件であることを明記すると、テスト時の混乱を防げます</li>
     </ul>
     <div class="note">
       <span class="hd">補足</span>

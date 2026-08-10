@@ -31,5 +31,9 @@ class Settings(BaseSettings):
     # 未設定のままだとジョブを誰でも起動できてしまうため、空なら実行を拒否する
     cron_secret: str = ""
 
+    # アプリ内で配信ジョブを定期実行する（外部Cronの追加費用を避けるため既定で有効）。
+    # 外部Cronへ移す場合は false にする
+    enable_scheduler: bool = True
+
 
 settings = Settings()
