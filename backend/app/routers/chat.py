@@ -1,6 +1,6 @@
 import asyncio
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import AsyncIterator
 from zoneinfo import ZoneInfo
 
@@ -83,6 +83,54 @@ def _sse(event: str, data: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
+def _trace(tool_events: list[dict], error: str | None) -> dict | None:
+    """messages.tool_calls に残す実行記録。
+    「動かなかった」と報告を受けたときに、どのツールが何を受け取って何を返したかを
+    後から追えるようにするためのもの。JSON化できない値が紛れても保存自体は通す。
+    """
+    if not tool_events and not error:
+        return None
+    payload: dict = {"events": tool_events}
+    if error:
+        payload["error"] = error
+    return json.loads(json.dumps(payload, ensure_ascii=False, default=str))
+
+
+def _persist_turn(
+    user_id: str,
+    user_message: str,
+    assistant_text: str,
+    tool_events: list[dict],
+    error: str | None = None,
+) -> None:
+    """1往復分の会話とツール実行記録を保存する。
+    user と assistant で created_at をずらすのは、同一時刻だと並び順が不定になり
+    次回の履歴読み込みで前後が入れ替わりうるため。
+    保存に失敗しても会話自体は成立しているので、例外は握りつぶす。
+    """
+    now = datetime.now(JST)
+    try:
+        get_supabase().table("messages").insert(
+            [
+                {
+                    "user_id": user_id,
+                    "role": "user",
+                    "content": [{"type": "text", "text": user_message}],
+                    "created_at": now.isoformat(),
+                },
+                {
+                    "user_id": user_id,
+                    "role": "assistant",
+                    "content": [{"type": "text", "text": assistant_text}],
+                    "tool_calls": _trace(tool_events, error),
+                    "created_at": (now + timedelta(milliseconds=1)).isoformat(),
+                },
+            ]
+        ).execute()
+    except Exception:  # noqa: BLE001
+        pass
+
+
 async def event_stream(user_id: str, user_message: str, profile: str | None = None) -> AsyncIterator[str]:
     client = AsyncAnthropic(api_key=settings.anthropic_api_key)
     sb = get_supabase()
@@ -137,27 +185,19 @@ async def event_stream(user_id: str, user_message: str, profile: str | None = No
         else:
             final_text = "申し訳ございません、処理に時間がかかっております。もう一度お試しください。"
     except Exception as exc:  # noqa: BLE001
+        # 失敗した回こそ後から原因を追いたいので、エラーとそこまでのツール実行を残す
+        await asyncio.to_thread(
+            _persist_turn, user_id, user_message, "", tool_events, str(exc)
+        )
         yield _sse("error", {"message": str(exc)})
         return
 
-    # ユーザーの体感速度優先: 会話ログの保存を待たず先に完了イベントを返す。
-    # 保存自体はレスポンスの後始末として並列実行する（失敗しても会話継続には影響しない）。
-    yield _sse("done", {"reply": final_text, "tool_events": tool_events})
+    # 保存を終えてから完了イベントを返す。フロントは done を受け取ると即座に接続を切るため、
+    # yield の後ろに書くと保存が実行されないまま打ち切られる可能性がある。
+    # 本文は既に delta で画面に出ており、ここでの待ちは体感にほぼ影響しない。
+    await asyncio.to_thread(_persist_turn, user_id, user_message, final_text, tool_events)
 
-    await asyncio.gather(
-        asyncio.to_thread(
-            lambda: sb.table("messages")
-            .insert({"user_id": user_id, "role": "user", "content": [{"type": "text", "text": user_message}]})
-            .execute()
-        ),
-        asyncio.to_thread(
-            lambda: sb.table("messages")
-            .insert(
-                {"user_id": user_id, "role": "assistant", "content": [{"type": "text", "text": final_text}]}
-            )
-            .execute()
-        ),
-    )
+    yield _sse("done", {"reply": final_text, "tool_events": tool_events})
 
 
 @router.post("")
