@@ -155,6 +155,8 @@
   }
   .urlbox a:hover, .urlbox a:focus-visible { background: var(--accent-bg); }
 
+  ul.plain { margin: 0; padding-left: 1.2rem; display: flex; flex-direction: column; gap: .5rem; font-size: .93rem; color: var(--ink-soft); }
+
   .checklist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .55rem; }
   .checklist li {
     display: grid;
@@ -341,6 +343,39 @@
       <li><span>iPhoneの方は<strong>Safari</strong>で開いてください。ホーム画面への追加がSafariから行えます。</span></li>
     </ul>
   </div>
+
+  <!-- ============ 概要 ============ -->
+  <section>
+    <div class="eyebrow">はじめに</div>
+    <h2>今できること・できないこと</h2>
+    <p class="lede">設定を始める前に、機能の範囲と現時点の制限をご確認ください。読んでおいていただくと、あとで戸惑うことが減ります。</p>
+
+    <h3>できること</h3>
+    <ul class="plain">
+      <li>会話（テキスト・音声）でのご予定登録・変更・空き時間確認</li>
+      <li>候補日の仮押さえ（返事待ちの間、他の予定で埋まらないよう自動でブロック）</li>
+      <li>1つのアカウント内で複数カレンダーを選び、同時登録・重複のない一覧表示</li>
+      <li>タスク（期限付きのやること）の登録・管理</li>
+      <li>毎朝のブリーフィングと、ご予定前のリマインダー（要設定・下記参照）</li>
+    </ul>
+
+    <h3>現時点でできないこと・制限があること</h3>
+    <div class="caution">
+      <span class="hd">機能の制限</span>
+      <p><strong>Outlook（Microsoft 365）は現在未対応です。</strong>設定作業中のため、いましばらくはGoogleカレンダーでご利用ください。</p>
+      <p><strong>オフラインでは使えません。</strong>通信が必要です。</p>
+      <p><strong>音声入力は対応ブラウザのみです。</strong>iPhoneはSafari、AndroidはChromeでお使いください。それ以外のブラウザでは音声入力が使えないことがあります（テキスト入力は問題なく使えます）。</p>
+      <p><strong>リマインダー・朝のブリーフィングは、設定をしないと届きません。</strong>既定ではオフです。設定方法はPart 2でご案内します。</p>
+    </div>
+
+    <h3>テスト運用にあたってのご留意事項</h3>
+    <div class="caution">
+      <span class="hd">運用上の注意</span>
+      <p><strong>Googleの審査がまだ完了していません。</strong>そのため連携時に「このアプリはGoogleで確認されていません」という警告画面が表示されます（Part 1で通過方法をご案内します）。開発中の社内アプリとして想定どおりの表示で、不具合ではありません。</p>
+      <p><strong>7日間操作がないと、Googleとの連携が自動的に切れることがあります。</strong>審査完了前の状態に起因する制限です。切れた場合は設定画面から再度「連携する」を押していただくだけで復旧します。なるべく定期的にお使いいただけると発生しにくくなります。</p>
+      <p><strong>開発中のため、不具合や使いにくい点が見つかることがあります。</strong>お気づきの点は、別途ご案内するフィードバックシートにご記入ください。改善に反映していきます。</p>
+    </div>
+  </section>
 
   <!-- ============ 1 ============ -->
   <section>
