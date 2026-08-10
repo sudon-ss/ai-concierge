@@ -324,7 +324,7 @@
     <div class="wordmark">THE CONCIERGE</div>
     <div class="hairline"></div>
     <h1>はじめての方向け<br>セットアップ手引き</h1>
-    <p>Googleカレンダーとの連携、スマホからのワンタップ起動、iPhoneカレンダーをお使いの方の移行手順まで。所要時間はおよそ10分です。</p>
+    <p>Googleカレンダーとの連携、スマホからのワンタップ起動、お知らせの受け取り設定、iPhoneカレンダーをお使いの方の移行手順まで。所要時間はおよそ10分です。</p>
   </header>
 
   <div class="panel">
@@ -458,11 +458,50 @@
       <p>ホーム画面のアイコンから開くと、ブラウザのアドレスバーが消えて全画面になります。ログイン状態も保持されるので、次からはタップするだけで秘書が立ち上がります。</p>
     </div>
 
-    <h3>リマインダーについて</h3>
+    <h3>お知らせを受け取る設定（この設定だけは必須です）</h3>
+    <p style="font-size:.93rem;color:var(--ink-soft)">
+      アプリを閉じていてもご予定の前にお知らせが届くようにします。<strong>この設定をしないと通知は鳴りません。</strong>
+      ホーム画面への追加を済ませてから行ってください。
+    </p>
+
+    <ol class="steps">
+      <li>
+        <div class="body">
+          <strong>ホーム画面のアイコンからアプリを開く</strong>
+          <p>Safariのタブから開いた状態では設定できません。<strong>必ずホーム画面のアイコンから</strong>起動してください（iPhoneの仕様です）。</p>
+        </div>
+      </li>
+      <li>
+        <div class="body">
+          <strong><span class="ui">PROFILE</span>（設定）→「リマインダー」を開く</strong>
+          <p>いちばん下に<span class="ui">端末へのお知らせ</span>という項目があります。</p>
+        </div>
+      </li>
+      <li>
+        <div class="body">
+          <strong><span class="ui">有効にする</span>を押して、許可する</strong>
+          <p>「通知を送信します。よろしいですか？」と聞かれるので<span class="ui">許可</span>を押します。</p>
+        </div>
+      </li>
+      <li>
+        <div class="body">
+          <strong><span class="ui">テスト通知を送る</span>で確認する</strong>
+          <p>通知が届けば設定完了です。以降はご予定の前と、毎朝のブリーフィング時刻にお知らせが届きます。</p>
+        </div>
+      </li>
+    </ol>
+
+    <div class="note">
+      <span class="hd">お知らせが届くタイミング</span>
+      <p><strong>ご予定の前</strong>— 設定した分数（既定は5分前）にお知らせします。分数は同じ「リマインダー」欄で変更できます。</p>
+      <p><strong>毎朝</strong>— 設定した時刻に、その日のご予定と期限の近いタスクをまとめてお知らせします。</p>
+    </div>
+
     <div class="caution">
-      <span class="hd">今のところ、アプリを開いている間だけ鳴ります</span>
-      <p>予定前のお知らせは、アプリを開いている状態で画面に出る仕組みです。アプリを閉じている間にスマホへ通知を飛ばす機能はまだ入っていません。</p>
-      <p>そのぶん、リマインダーをオンにしている間は<strong>画面が自動で暗くならない</strong>ようにしてあります。会議前に開いたまま置いておけば見逃しません。</p>
+      <span class="hd">うまくいかないとき</span>
+      <p><strong>「有効にする」が押せない</strong>— Safariのタブから開いています。ホーム画面のアイコンから開き直してください。</p>
+      <p><strong>ボタンが見当たらない・許可が出ない</strong>— 以前にホーム画面へ追加した方は、一度アイコンを削除してから追加し直してください。</p>
+      <p><strong>それでも届かない</strong>— iPhoneの「設定」→「通知」に THE CONCIERGE があるかご確認ください。無い場合は追加し直しが必要です。</p>
     </div>
   </section>
 
@@ -575,6 +614,51 @@
     <div class="note">
       <span class="hd">仕上げに</span>
       <p>方法Cは過去分のコピーです。これから作る予定も秘書に見せたい場合は、あわせて方法Aの設定もしておいてください。</p>
+    </div>
+  </section>
+
+  <!-- ============ 管理者向け ============ -->
+  <section>
+    <div class="eyebrow">For Administrators</div>
+    <h2>管理者の方へ<br>メンバーを追加する</h2>
+    <p class="lede">新しく使う方が増えたときの作業です。ご利用される方はこの章を読み飛ばしていただいて構いません。</p>
+
+    <div class="note">
+      <span class="hd">アプリ側の作業は不要です</span>
+      <p>追加した方がご自身のGoogleアカウントで連携すれば、その方専用のデータ領域が自動で作られます。必要なのは、Googleの利用許可リストに1名を加えることだけです。</p>
+    </div>
+
+    <ol class="steps">
+      <li>
+        <div class="body">
+          <strong>Google Cloud Console を開く</strong>
+          <p><a href="https://console.cloud.google.com/">console.cloud.google.com</a> を開き、画面上部でこのアプリのプロジェクトが選ばれているかご確認ください。</p>
+        </div>
+      </li>
+      <li>
+        <div class="body">
+          <strong>「Google Auth Platform」→「対象」を開く</strong>
+          <p>以前の画面では<span class="path">APIとサービス → OAuth同意画面</span>です。表示が違う場合は、上部の検索窓に「OAuth」と入れると辿り着けます。</p>
+        </div>
+      </li>
+      <li>
+        <div class="body">
+          <strong>「テストユーザー」の<span class="ui">＋ ユーザーを追加</span>を押す</strong>
+          <p>追加したい方の<strong>Gmailアドレス</strong>を入力して保存します。反映は即時で、審査などの待ち時間はありません。</p>
+        </div>
+      </li>
+      <li>
+        <div class="body">
+          <strong>本人にURLとこの手引きを渡す</strong>
+          <p>あとはこの手引きのとおりに進めていただければ使い始められます。</p>
+        </div>
+      </li>
+    </ol>
+
+    <div class="caution">
+      <span class="hd">よくある行き違い</span>
+      <p><strong>登録したアドレスと、本人がログインで選ぶアドレスは一致している必要があります。</strong>仕事用と個人用の2つのGoogleアカウントをお持ちの方には、どちらで使うか事前にご確認ください。違うアドレスを選ぶと「アクセスをブロックしました」と表示されます。</p>
+      <p>テストユーザーは100人まで登録できます。現在の人数であれば余裕があります。</p>
     </div>
   </section>
 
