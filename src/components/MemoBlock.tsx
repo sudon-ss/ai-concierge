@@ -9,13 +9,13 @@ interface Props {
 
 export function MemoBlock({ event, onToggleFlag }: Props) {
   if (!event.memo) {
+    // このコンポーネントは予定カード（クリックで編集画面を開く要素）の中に描画されるため、
+    // ここに<button>をネストすると無効なHTMLになりクリックが効かなくなる。カード自体の
+    // クリックで編集画面が開き、そこでメモを追加できるので、ここは案内表示だけにする。
     return (
-      <button
-        type="button"
-        className="text-xs text-navy-400 hover:text-navy-700 underline-offset-2 hover:underline"
-      >
+      <span className="text-xs text-navy-400 hover:text-navy-700 underline-offset-2 hover:underline">
         ＋ メモを追加
-      </button>
+      </span>
     )
   }
 

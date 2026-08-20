@@ -11,6 +11,7 @@ import { detectScheduleIntent, extractIntent, type ExtractedIntent } from '../li
 import {
   clearChatHistory,
   confirmEvent,
+  deleteEventApi,
   getBriefing,
   getSession,
   hasBackend,
@@ -30,6 +31,7 @@ const TOOL_STATUS_LABELS: Record<string, string> = {
   get_free_slots: '🔍 空き時間を確認しています…',
   create_event: '📅 カレンダーに登録しています…',
   reschedule_event: '🔄 ご予定を変更しています…',
+  stage_event_deletion: '🗑️ 対象のご予定を確認しています…',
   create_task: '📝 タスクを登録しています…',
   judge_memo_importance: '📝 メモを確認しています…',
 }
@@ -161,7 +163,8 @@ const formatScheduleQuestion = (intent: ExtractedIntent): string => {
   return `「${intent.title}」${tag} にてご用意いたします。下記候補からお選びくださいませ。`
 }
 
-const detectIntentKind = (text: string): 'slots' | 'reschedule' | 'schedule' | 'chat' => {
+const detectIntentKind = (text: string): 'slots' | 'reschedule' | 'delete' | 'schedule' | 'chat' => {
+  if (/消して|削除|取り消して|キャンセルして/.test(text)) return 'delete'
   if (/後ろ倒し|前倒し|リスケ|変更|延期|早める|遅らせる/.test(text)) return 'reschedule'
   if (/空いて|空き|候補|提案/.test(text)) return 'slots'
   if (detectScheduleIntent(text)) return 'schedule'
@@ -272,6 +275,28 @@ export function ChatPage() {
           targetDate: intent.targetDate,
           targetHour: intent.targetHour,
         },
+      }
+    }
+
+    const stagedDeletion = res.tool_events.find(
+      (e) => e.name === 'stage_event_deletion' && e.result && typeof e.result === 'object',
+    )
+    if (stagedDeletion) {
+      const result = stagedDeletion.result as {
+        event_id: string
+        calendar: 'google' | 'outlook'
+        title: string
+        start: string
+        location?: string
+      }
+      return {
+        type: 'delete_confirm',
+        eventId: result.event_id,
+        eventTitle: result.title,
+        eventStart: result.start,
+        location: result.location,
+        calendar: result.calendar,
+        status: 'pending',
       }
     }
 
@@ -424,6 +449,37 @@ export function ChatPage() {
           oldStart: target.start,
           newStart: newStart.toISOString(),
           status: 'done',
+        },
+      })
+      return
+    }
+
+    if (kind === 'delete') {
+      const now = new Date().toISOString()
+      const target = events.find((e) => e.start > now) ?? events[0]
+      if (!target) {
+        append({
+          id: uid(),
+          role: 'assistant',
+          createdAt: new Date().toISOString(),
+          content: {
+            type: 'text',
+            text: '恐れ入りますが、現在削除可能なご予定がございません。',
+          },
+        })
+        return
+      }
+      append({
+        id: uid(),
+        role: 'assistant',
+        createdAt: new Date().toISOString(),
+        content: {
+          type: 'delete_confirm',
+          eventId: target.id,
+          eventTitle: target.title,
+          eventStart: target.start,
+          location: target.location,
+          status: 'pending',
         },
       })
       return
@@ -684,6 +740,65 @@ export function ChatPage() {
     )
   }
 
+  const onConfirmDelete = (id: string) => {
+    const msg = messages.find((m) => m.id === id)
+    if (!msg || msg.content.type !== 'delete_confirm') return
+    const { eventId, calendar } = msg.content
+
+    const markDone = () =>
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === id && m.content.type === 'delete_confirm'
+            ? { ...m, content: { ...m.content, status: 'done' } }
+            : m,
+        ),
+      )
+    const markFailed = () =>
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === id && m.content.type === 'delete_confirm'
+            ? {
+                ...m,
+                content: {
+                  type: 'text',
+                  text: '恐れ入ります、削除に失敗いたしました。もう一度お試しくださいませ。',
+                },
+              }
+            : m,
+        ),
+      )
+
+    if (hasBackend() && getSession()) {
+      if (!calendar) {
+        markFailed()
+        return
+      }
+      deleteEventApi({ calendar, event_id: eventId }).then(markDone).catch(markFailed)
+      return
+    }
+    deleteEvent(eventId)
+    markDone()
+  }
+
+  const onCancelDelete = (id: string) => {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === id && m.content.type === 'delete_confirm'
+          ? { ...m, content: { ...m.content, status: 'cancelled' } }
+          : m,
+      ),
+    )
+    append({
+      id: uid(),
+      role: 'assistant',
+      createdAt: new Date().toISOString(),
+      content: {
+        type: 'text',
+        text: '失礼いたしました。あらためて削除したいご予定をお知らせくださいませ。',
+      },
+    })
+  }
+
   const onToggleFlag = (eventId: string) => {
     setMessages((prev) =>
       prev.map((m) =>
@@ -741,6 +856,8 @@ export function ChatPage() {
             onCancelSlot={onCancelSlot}
             onToggleFlag={onToggleFlag}
             onBlockAll={onBlockAll}
+            onConfirmDelete={onConfirmDelete}
+            onCancelDelete={onCancelDelete}
             googleConnected={settings.calendarConnected.google}
             outlookConnected={settings.calendarConnected.outlook}
           />

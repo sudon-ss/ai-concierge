@@ -74,6 +74,15 @@ export type MessageContent =
       newStart: string
       status: 'pending' | 'done' | 'cancelled'
     }
+  | {
+      type: 'delete_confirm'
+      eventId: string
+      eventTitle: string
+      eventStart: string
+      location?: string
+      calendar?: CalendarEvent['source']
+      status: 'pending' | 'done' | 'cancelled'
+    }
 
 export interface ChatMessage {
   id: string

@@ -1,5 +1,7 @@
 import asyncio
 import time
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from .adapters.base import CalendarAdapter
 from .adapters.google_calendar import GoogleCalendarAdapter, list_google_calendars, refresh_google_token
@@ -7,6 +9,23 @@ from .adapters.outlook_calendar import OutlookCalendarAdapter, list_outlook_cale
 from .auth import get_oauth_tokens, save_oauth_tokens
 
 REFRESH_BUFFER_SECONDS = 120
+
+JST = ZoneInfo("Asia/Tokyo")
+
+
+def normalize_instant(value: str | None) -> datetime:
+    """日時文字列を比較可能なawareなdatetimeに正規化する。
+    Googleはオフセット付き（+09:00）、Outlookはオフセットなしの文字列を返すなど
+    プロバイダによって表記形式が異なり、文字列のまま比較すると同一の予定でも
+    一致判定・並び替えに失敗することがあるため、実際の日時としてパースしてから使う。
+    """
+    if not value:
+        return datetime.min.replace(tzinfo=JST)
+    try:
+        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return datetime.min.replace(tzinfo=JST)
+    return dt if dt.tzinfo else dt.replace(tzinfo=JST)
 
 
 async def _get_valid_token_row(user_id: str, provider: str) -> dict | None:
@@ -84,10 +103,14 @@ def dedupe_events(events: list[dict]) -> list[dict]:
 
     まとめた元の予定は copies に残す。予定を変更する際、まとめて表示している
     3件を1回の指示で同時に動かすために必要になる。
+
+    突き合わせにはstart/endの生文字列ではなく正規化した日時を使う。Googleは
+    オフセット付き（+09:00）、Outlookはオフセットなしの文字列を返すなど表記が
+    異なり、文字列のままだと同一の予定でも一致しないことがあるため。
     """
     merged: dict[tuple, dict] = {}
     for ev in events:
-        key = (ev.get("title"), ev.get("start"), ev.get("end"))
+        key = (ev.get("title"), normalize_instant(ev.get("start")), normalize_instant(ev.get("end")))
         existing = merged.get(key)
         if existing is None:
             merged[key] = {**ev, "copies": [_copy_ref(ev)]}

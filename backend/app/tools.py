@@ -1,7 +1,13 @@
 import asyncio
 from datetime import datetime, timedelta
 
-from .calendar_service import dedupe_events, get_adapter, get_connected_adapters, get_write_adapters
+from .calendar_service import (
+    dedupe_events,
+    get_adapter,
+    get_connected_adapters,
+    get_write_adapters,
+    normalize_instant,
+)
 from .database import get_supabase
 
 IMPORTANT_KEYWORDS = ["持っていく", "準備", "印刷", "届ける", "提出", "用意", "締め切り", "締切"]
@@ -194,7 +200,7 @@ async def _load_events(user_id: str, time_min: datetime, time_max: datetime) -> 
         return []
     results = await asyncio.gather(*[a.list_events(time_min, time_max) for a in adapters.values()])
     events = dedupe_events([ev for lst in results for ev in lst])
-    events.sort(key=lambda e: e["start"] or "")
+    events.sort(key=lambda e: normalize_instant(e["start"]))
     return events
 
 
@@ -222,12 +228,8 @@ async def find_events(user_id: str, date_from: str, date_to: str) -> dict:
     }
 
 
-async def reschedule_event(
-    user_id: str, *, calendar: str, event_id: str, new_start: str, new_end: str
-) -> dict:
-    """予定の時刻を変更する。同じ予定を複数カレンダーに登録している場合は、
-    その全コピーを同時に動かす（片方だけ動いて食い違うのを防ぐ）。
-    """
+async def _find_target_event(user_id: str, event_id: str) -> dict:
+    """event_id（コピーのidも含む）から、変更・削除対象の予定を1件特定する。"""
     now = datetime.now().astimezone()
     events = await _load_events(
         user_id, now - timedelta(days=1), now + timedelta(days=RESCHEDULE_SEARCH_DAYS)
@@ -237,17 +239,30 @@ async def reschedule_event(
         None,
     )
     if target is None:
-        raise ValueError("変更対象の予定が見つかりませんでした。find_eventsで予定を確認してください")
+        raise ValueError("対象の予定が見つかりませんでした。find_eventsで予定を確認してください")
+    return target
 
-    start = datetime.fromisoformat(new_start)
-    end = datetime.fromisoformat(new_end)
-    copies = target.get("copies") or [{"id": event_id, "calendar_id": None, "source": calendar}]
 
+async def _adapters_for_copies(user_id: str, copies: list[dict]) -> dict[str, object]:
     adapters: dict[str, object] = {}
     for provider in {c["source"] for c in copies}:
         adapter = await get_adapter(user_id, provider)
         if adapter:
             adapters[provider] = adapter
+    return adapters
+
+
+async def reschedule_event(
+    user_id: str, *, calendar: str, event_id: str, new_start: str, new_end: str
+) -> dict:
+    """予定の時刻を変更する。同じ予定を複数カレンダーに登録している場合は、
+    その全コピーを同時に動かす（片方だけ動いて食い違うのを防ぐ）。
+    """
+    target = await _find_target_event(user_id, event_id)
+    start = datetime.fromisoformat(new_start)
+    end = datetime.fromisoformat(new_end)
+    copies = target.get("copies") or [{"id": event_id, "calendar_id": None, "source": calendar}]
+    adapters = await _adapters_for_copies(user_id, copies)
 
     async def move_one(copy: dict) -> dict | None:
         adapter = adapters.get(copy["source"])
@@ -269,6 +284,112 @@ async def reschedule_event(
     ).in_("ext_id", [c["id"] for c in copies]).execute()
 
     return {**moved[0], "updated_calendars": len(moved), "total_calendars": len(copies)}
+
+
+async def stage_event_deletion(user_id: str, *, event_id: str) -> dict:
+    """予定削除の確認カードを表示するため、対象イベントの情報を返す（この時点では削除しない）。
+    実際の削除はユーザーが画面のボタンで確認した後、APIから直接delete_eventが呼ばれる。
+    """
+    target = await _find_target_event(user_id, event_id)
+    return {
+        "event_id": target["id"],
+        "calendar": target["source"],
+        "title": target["title"],
+        "start": target["start"],
+        "end": target["end"],
+        "location": target.get("location"),
+    }
+
+
+async def delete_event(user_id: str, *, calendar: str, event_id: str) -> dict:
+    """予定を削除する。同じ予定を複数カレンダーに登録している場合は、その全コピーを削除する。"""
+    target = await _find_target_event(user_id, event_id)
+    copies = target.get("copies") or [{"id": event_id, "calendar_id": None, "source": calendar}]
+    adapters = await _adapters_for_copies(user_id, copies)
+
+    async def delete_one(copy: dict) -> bool:
+        adapter = adapters.get(copy["source"])
+        if not adapter:
+            return False
+        try:
+            await adapter.delete_event(copy["id"], calendar_id=copy.get("calendar_id"))
+            return True
+        except Exception:
+            return False
+
+    results = await asyncio.gather(*[delete_one(c) for c in copies])
+    if not any(results):
+        raise ValueError("予定の削除に失敗しました")
+
+    get_supabase().table("events").delete().eq("user_id", user_id).in_(
+        "ext_id", [c["id"] for c in copies]
+    ).execute()
+
+    return {"event_id": event_id, "title": target["title"], "deleted_calendars": sum(results)}
+
+
+async def update_event_fields(
+    user_id: str,
+    *,
+    calendar: str,
+    event_id: str,
+    title: str | None = None,
+    start: str | None = None,
+    end: str | None = None,
+    location: str | None = None,
+    memo: str | None = None,
+    memo_flagged: bool | None = None,
+) -> dict:
+    """Schedule画面の編集モーダルからの更新。件名・時刻・場所はカレンダー本体に、
+    メモ・フラグはSupabase側のみに反映する（カレンダーAPIにメモ欄が無いため）。
+    同じ予定が複数カレンダーに登録されている場合は全コピーへ反映する。
+    """
+    target = await _find_target_event(user_id, event_id)
+    copies = target.get("copies") or [{"id": event_id, "calendar_id": None, "source": calendar}]
+    adapters = await _adapters_for_copies(user_id, copies)
+
+    start_dt = datetime.fromisoformat(start) if start else None
+    end_dt = datetime.fromisoformat(end) if end else None
+
+    async def update_one(copy: dict) -> dict | None:
+        adapter = adapters.get(copy["source"])
+        if not adapter:
+            return None
+        try:
+            return await adapter.update_event(
+                copy["id"],
+                title=title,
+                start=start_dt,
+                end=end_dt,
+                location=location,
+                calendar_id=copy.get("calendar_id"),
+            )
+        except Exception:
+            return None
+
+    updated = [ev for ev in await asyncio.gather(*[update_one(c) for c in copies]) if ev]
+    if not updated:
+        raise ValueError("予定の更新に失敗しました")
+
+    sb_updates: dict = {}
+    if title is not None:
+        sb_updates["title"] = updated[0]["title"]
+    if start_dt is not None:
+        sb_updates["start_at"] = updated[0]["start"]
+    if end_dt is not None:
+        sb_updates["end_at"] = updated[0]["end"]
+    if location is not None:
+        sb_updates["location"] = updated[0].get("location")
+    if memo is not None:
+        sb_updates["memo"] = memo
+    if memo_flagged is not None:
+        sb_updates["memo_flagged"] = memo_flagged
+    if sb_updates:
+        get_supabase().table("events").update(sb_updates).eq("user_id", user_id).in_(
+            "ext_id", [c["id"] for c in copies]
+        ).execute()
+
+    return {**updated[0], "updated_calendars": len(updated), "total_calendars": len(copies)}
 
 
 TOOLS = [
@@ -334,6 +455,23 @@ TOOLS = [
         },
     },
     {
+        "name": "stage_event_deletion",
+        "description": (
+            "予定の削除意思を確認するため、対象イベントの情報を画面に提示する"
+            "（この時点ではまだ削除されない）。event_id は find_events で取得したものを使うこと。"
+            "呼び出すと画面に削除確認のボタン（はい/いいえ）が表示され、ユーザーがボタンで"
+            "最終回答するため、この後テキストで改めて「よろしいですか」と尋ねる必要はない。"
+            "実際の削除はボタン操作から直接行われるため、削除用の道具は別途存在しない。"
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "event_id": {"type": "string", "description": "find_eventsで取得したevent_id"},
+            },
+            "required": ["event_id"],
+        },
+    },
+    {
         "name": "create_task",
         "description": (
             "期限はあるが特定の開始・終了時刻を持たない「やること」をタスクとして登録する"
@@ -371,6 +509,8 @@ async def run_tool(name: str, user_id: str, tool_input: dict) -> dict:
         return await find_events(user_id, tool_input["date_from"], tool_input["date_to"])
     if name == "reschedule_event":
         return await reschedule_event(user_id, **tool_input)
+    if name == "stage_event_deletion":
+        return await stage_event_deletion(user_id, event_id=tool_input["event_id"])
     if name == "create_task":
         return await create_task(user_id, **tool_input)
     if name == "judge_memo_importance":

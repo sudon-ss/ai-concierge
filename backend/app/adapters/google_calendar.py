@@ -112,15 +112,21 @@ class GoogleCalendarAdapter(CalendarAdapter):
         self,
         event_id: str,
         *,
+        title: str | None = None,
         start: datetime | None = None,
         end: datetime | None = None,
+        location: str | None = None,
         calendar_id: str | None = None,
     ) -> dict:
         body = {}
+        if title is not None:
+            body["summary"] = title
         if start:
             body["start"] = {"dateTime": start.isoformat()}
         if end:
             body["end"] = {"dateTime": end.isoformat()}
+        if location is not None:
+            body["location"] = location
         path = quote(calendar_id, safe="") if calendar_id else self._write_path
         resp = await self._client.patch(f"/calendars/{path}/events/{event_id}", json=body)
         resp.raise_for_status()

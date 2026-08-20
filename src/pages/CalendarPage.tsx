@@ -5,7 +5,7 @@ import { CalendarBadge } from '../components/CalendarBadge'
 import { MemoBlock } from '../components/MemoBlock'
 import { EventEditModal } from '../components/EventEditModal'
 import type { CalendarEvent } from '../types'
-import { getSession, hasBackend, listEvents } from '../lib/api'
+import { deleteEventApi, getSession, hasBackend, listEvents, updateEventApi } from '../lib/api'
 
 const groupByDay = (iso: string) =>
   new Date(iso).toLocaleDateString('ja-JP', {
@@ -36,6 +36,7 @@ export function CalendarPage() {
   const { events: demoEvents, profile, addEvent, updateEvent, deleteEvent, resetEvents } = useProfile()
   const [editing, setEditing] = useState<CalendarEvent | null>(null)
   const [isNew, setIsNew] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   // 実バックエンド接続時は、Phase 0のデモデータではなく実際に連携済みのカレンダーを表示する
   const backendMode = hasBackend() && Boolean(getSession())
@@ -86,7 +87,7 @@ export function CalendarPage() {
   }
 
   const openEdit = (e: CalendarEvent) => {
-    if (backendMode) return // 実データの編集はチャット（またはGoogleカレンダー側）で行う
+    setSaveError(null)
     setEditing(e)
     setIsNew(false)
   }
@@ -94,22 +95,56 @@ export function CalendarPage() {
   const closeEdit = () => {
     setEditing(null)
     setIsNew(false)
+    setSaveError(null)
   }
+
+  // dedupe_events は常にcopiesを持たせて返すため、'both'（Google+Outlook両方に登録済み）の
+  // 場合でもこの値は実際には使われない（copies側の各カレンダーが優先される）フォールバック用の値
+  const calendarOf = (e: CalendarEvent): 'google' | 'outlook' => (e.source === 'both' ? 'google' : e.source)
 
   const handleSave = (updates: Partial<CalendarEvent>) => {
     if (!editing) return
-    if (isNew) {
-      addEvent({ ...editing, ...updates })
-    } else {
-      updateEvent(editing.id, updates)
+    if (!backendMode) {
+      if (isNew) {
+        addEvent({ ...editing, ...updates })
+      } else {
+        updateEvent(editing.id, updates)
+      }
+      closeEdit()
+      return
     }
-    closeEdit()
+    setSaveError(null)
+    updateEventApi({
+      calendar: calendarOf(editing),
+      event_id: editing.id,
+      title: updates.title,
+      start: updates.start,
+      end: updates.end,
+      location: updates.location,
+      memo: updates.memo,
+      memo_flagged: updates.memoFlagged,
+    })
+      .then(() => {
+        closeEdit()
+        loadReal()
+      })
+      .catch(() => setSaveError('恐れ入ります、ご予定の更新に失敗いたしました。もう一度お試しくださいませ。'))
   }
 
   const handleDelete = () => {
     if (!editing) return
-    deleteEvent(editing.id)
-    closeEdit()
+    if (!backendMode) {
+      deleteEvent(editing.id)
+      closeEdit()
+      return
+    }
+    setSaveError(null)
+    deleteEventApi({ calendar: calendarOf(editing), event_id: editing.id })
+      .then(() => {
+        closeEdit()
+        loadReal()
+      })
+      .catch(() => setSaveError('恐れ入ります、ご予定の削除に失敗いたしました。もう一度お試しくださいませ。'))
   }
 
   const handleReset = () => {
@@ -170,7 +205,7 @@ export function CalendarPage() {
 
       {backendMode && (
         <p className="text-[11px] text-navy-400 -mt-3">
-          ご予定の追加・変更は「チャット」タブからお申し付けください。
+          ご予定の新規登録は「チャット」タブからお申し付けください。変更・削除はこの一覧からも行えます。
         </p>
       )}
 
@@ -193,8 +228,7 @@ export function CalendarPage() {
                 <button
                   type="button"
                   onClick={() => openEdit(e)}
-                  disabled={backendMode}
-                  className="w-full card p-3 text-left hover:border-gold-300 transition disabled:hover:border-navy-100 disabled:cursor-default"
+                  className="w-full card p-3 text-left hover:border-gold-300 transition"
                 >
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-mono text-sm text-navy-700 tabular-nums">
@@ -218,6 +252,8 @@ export function CalendarPage() {
           onClose={closeEdit}
           onSave={handleSave}
           onDelete={handleDelete}
+          errorText={saveError}
+          lockCalendar={backendMode}
         />
       )}
     </div>

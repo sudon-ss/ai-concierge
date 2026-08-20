@@ -8,6 +8,9 @@ interface Props {
   onClose: () => void
   onSave: (updates: Partial<CalendarEvent>) => void
   onDelete: () => void
+  errorText?: string | null
+  /** 実カレンダー連携時は、登録先カレンダーの切替に対応していないため選択を無効化する */
+  lockCalendar?: boolean
 }
 
 const toLocalInputValue = (iso: string): string => {
@@ -20,7 +23,7 @@ const fromLocalInputValue = (value: string): string => {
   return new Date(value).toISOString()
 }
 
-export function EventEditModal({ event, onClose, onSave, onDelete }: Props) {
+export function EventEditModal({ event, onClose, onSave, onDelete, errorText, lockCalendar }: Props) {
   const [title, setTitle] = useState(event.title)
   const [location, setLocation] = useState(event.location ?? '')
   const [memo, setMemo] = useState(event.memo ?? '')
@@ -76,6 +79,11 @@ export function EventEditModal({ event, onClose, onSave, onDelete }: Props) {
         </header>
 
         <div className="p-4 space-y-3">
+          {errorText && (
+            <div className="rounded-md bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">
+              {errorText}
+            </div>
+          )}
           <label className="block">
             <span className="text-xs font-medium text-navy-700">件名</span>
             <input
@@ -114,9 +122,11 @@ export function EventEditModal({ event, onClose, onSave, onDelete }: Props) {
                 <button
                   key={s}
                   type="button"
+                  disabled={lockCalendar}
                   onClick={() => setSource(s)}
                   className={clsx(
                     'rounded-md border py-1.5 text-xs font-medium transition',
+                    lockCalendar && 'cursor-not-allowed opacity-60',
                     source === s
                       ? 'bg-navy-800 border-navy-800 text-gold-300'
                       : 'bg-white border-navy-200 text-navy-700 hover:bg-cream-50',
@@ -126,6 +136,9 @@ export function EventEditModal({ event, onClose, onSave, onDelete }: Props) {
                 </button>
               ))}
             </div>
+            {lockCalendar && (
+              <p className="text-[11px] text-navy-400 mt-1">登録先カレンダーの変更には対応していません</p>
+            )}
           </label>
 
           <label className="block">

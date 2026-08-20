@@ -112,15 +112,21 @@ class OutlookCalendarAdapter(CalendarAdapter):
         self,
         event_id: str,
         *,
+        title: str | None = None,
         start: datetime | None = None,
         end: datetime | None = None,
+        location: str | None = None,
         calendar_id: str | None = None,
     ) -> dict:
         body = {}
+        if title is not None:
+            body["subject"] = title
         if start:
             body["start"] = {"dateTime": start.isoformat(), "timeZone": "Asia/Tokyo"}
         if end:
             body["end"] = {"dateTime": end.isoformat(), "timeZone": "Asia/Tokyo"}
+        if location is not None:
+            body["location"] = {"displayName": location}
         # Graphはイベントidが全カレンダー横断で一意なため /me/events/{id} で更新できる
         path = "/me" if calendar_id else self._write_path
         resp = await self._client.patch(f"{path}/events/{event_id}", json=body)

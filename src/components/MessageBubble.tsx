@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { Check, MapPin } from 'lucide-react'
+import { Check, MapPin, X } from 'lucide-react'
 import type { ChatMessage, FreeSlot, CalendarEvent } from '../types'
 import { ConciergeMark } from './ConciergeMark'
 import { BriefingCard } from './BriefingCard'
@@ -17,6 +17,8 @@ interface Props {
   onCancelSlot?: (id: string) => void
   onToggleFlag?: (eventId: string) => void
   onBlockAll?: (id: string) => void
+  onConfirmDelete?: (id: string) => void
+  onCancelDelete?: (id: string) => void
   googleConnected?: boolean
   outlookConnected?: boolean
 }
@@ -30,6 +32,8 @@ export function MessageBubble({
   onCancelSlot,
   onToggleFlag,
   onBlockAll,
+  onConfirmDelete,
+  onCancelDelete,
   googleConnected,
   outlookConnected,
 }: Props) {
@@ -126,6 +130,54 @@ export function MessageBubble({
               </div>
             ) : (
               <p className="text-slate-500">変更を取り消しいたしました</p>
+            )}
+          </div>
+        )}
+        {message.content.type === 'delete_confirm' && (
+          <div className="card-elevated p-3 w-full text-sm">
+            {message.content.status === 'pending' && (
+              <div className="space-y-3">
+                <div>
+                  <p className="text-navy-900">こちらのご予定を削除して問題ございませんか？</p>
+                  <p className="text-navy-800 font-medium mt-1.5">{message.content.eventTitle}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {fmtTime(message.content.eventStart)}
+                    {message.content.location && (
+                      <span className="ml-2 inline-flex items-center gap-0.5">
+                        <MapPin size={10} /> {message.content.location}
+                      </span>
+                    )}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onConfirmDelete?.(message.id)}
+                    className="flex-1 rounded-md bg-gradient-to-r from-gold-500 to-gold-400 hover:from-gold-600 hover:to-gold-500 text-navy-900 text-sm font-semibold py-2"
+                  >
+                    はい
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onCancelDelete?.(message.id)}
+                    className="flex-1 rounded-md border border-navy-200 text-navy-700 hover:bg-cream-50 text-sm font-semibold py-2"
+                  >
+                    いいえ
+                  </button>
+                </div>
+              </div>
+            )}
+            {message.content.status === 'done' && (
+              <div className="flex items-center gap-2 text-navy-800">
+                <Check size={16} className="text-gold-600" />
+                <span>「{message.content.eventTitle}」を削除いたしました</span>
+              </div>
+            )}
+            {message.content.status === 'cancelled' && (
+              <div className="flex items-center gap-2 text-slate-500">
+                <X size={16} />
+                <span>削除を取りやめました</span>
+              </div>
             )}
           </div>
         )}

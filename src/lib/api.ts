@@ -246,6 +246,36 @@ export function confirmEvent(input: CreateEventInput): Promise<CreatedEvent[]> {
   return apiFetch<CreatedEvent[]>('/api/events', { method: 'POST', body: JSON.stringify(input) })
 }
 
+export interface DeleteEventInput {
+  calendar: 'google' | 'outlook'
+  event_id: string
+}
+
+/** チャットの削除確認カード「はい」ボタン、およびSchedule画面の編集モーダルの
+ *  「削除」ボタンから、会話を介さず直接カレンダーから削除する。 */
+export function deleteEventApi(input: DeleteEventInput): Promise<{ event_id: string; title: string }> {
+  return apiFetch<{ event_id: string; title: string }>('/api/events/delete', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+}
+
+export interface UpdateEventInput {
+  calendar: 'google' | 'outlook'
+  event_id: string
+  title?: string
+  start?: string
+  end?: string
+  location?: string
+  memo?: string
+  memo_flagged?: boolean
+}
+
+/** Schedule画面の編集モーダルから、件名・時刻・場所・メモの変更を直接カレンダーへ反映する。 */
+export function updateEventApi(input: UpdateEventInput): Promise<CreatedEvent> {
+  return apiFetch<CreatedEvent>('/api/events/update', { method: 'POST', body: JSON.stringify(input) })
+}
+
 /** 仮押さえした枠を後から削除するために必要な最小情報 */
 export interface TentativeRef {
   calendar: 'google' | 'outlook'

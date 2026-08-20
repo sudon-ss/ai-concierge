@@ -20,8 +20,10 @@ class CalendarAdapter(ABC):
         self,
         event_id: str,
         *,
+        title: str | None = None,
         start: datetime | None = None,
         end: datetime | None = None,
+        location: str | None = None,
         calendar_id: str | None = None,
     ) -> dict:
         """更新後のイベントを共通フォーマットで返す。
