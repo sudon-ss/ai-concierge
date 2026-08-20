@@ -63,21 +63,28 @@ export function useSpeechRecognition({ lang = 'ja-JP', onFinalResult }: Options 
     !!(window.SpeechRecognition || window.webkitSpeechRecognition)
 
   const manualStopRef = useRef(false)
+  const hasStartedRef = useRef(false)
+  const permissionRetryRef = useRef(false)
 
-  const start = () => {
+  const start = (isRetry = false) => {
     if (!supported) {
       setError('このブラウザは音声認識に対応していません。Chrome / Edge / Safari でお試しください。')
       return
     }
     setError(null)
     manualStopRef.current = false
+    hasStartedRef.current = false
+    if (!isRetry) permissionRetryRef.current = false
     const Recognition = (window.SpeechRecognition || window.webkitSpeechRecognition) as SpeechRecognitionCtor
     const r = new Recognition()
     r.lang = lang
     r.continuous = false
     r.interimResults = true
 
-    r.onstart = () => setIsListening(true)
+    r.onstart = () => {
+      hasStartedRef.current = true
+      setIsListening(true)
+    }
     r.onend = () => {
       setIsListening(false)
       setInterimText('')
@@ -87,6 +94,14 @@ export function useSpeechRecognition({ lang = 'ja-JP', onFinalResult }: Options 
       // 自分でstop()を呼んだ直後の 'aborted' はエラー表示しない
       if (e.error === 'aborted' && manualStopRef.current) {
         setIsListening(false)
+        return
+      }
+      // iOS Safariはマイク許可ダイアログの表示中に作られたセッションを、許可が下りた
+      // 瞬間に無効化して 'aborted' を返すことがある（実際の音声入力は一度も始まっていない）。
+      // この場合は許可済みなので、新しいセッションで自動的に1回だけ再試行する。
+      if (e.error === 'aborted' && !hasStartedRef.current && !permissionRetryRef.current) {
+        permissionRetryRef.current = true
+        setTimeout(() => start(true), 200)
         return
       }
       const map: Record<string, string> = {
