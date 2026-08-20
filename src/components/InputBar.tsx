@@ -10,7 +10,7 @@ interface Props {
 export function InputBar({ onSend }: Props) {
   const [value, setValue] = useState('')
 
-  const { supported, isListening, interimText, error, start, stop, clearError } =
+  const { supported, isStandalone, isListening, interimText, error, start, stop, clearError } =
     useSpeechRecognition({
       onFinalResult: (text) => onSend(text),
     })
@@ -27,6 +27,8 @@ export function InputBar({ onSend }: Props) {
     if (isListening) stop()
     else start()
   }
+
+  const voiceDisabled = !supported || isStandalone
 
   const placeholder = isListening
     ? interimText
@@ -55,17 +57,19 @@ export function InputBar({ onSend }: Props) {
         <button
           type="button"
           onClick={toggleVoice}
-          disabled={!supported}
+          disabled={voiceDisabled}
           title={
             !supported
               ? 'このブラウザは音声入力に対応していません'
+              : isStandalone
+              ? 'ホーム画面に追加したアプリでは音声入力がご利用いただけません。Safariで直接開いてお試しください。'
               : isListening
               ? '録音停止'
               : '音声入力'
           }
           className={clsx(
             'shrink-0 size-11 rounded-full flex items-center justify-center transition relative shadow-gold',
-            !supported
+            voiceDisabled
               ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
               : isListening
               ? 'bg-gold-500 text-navy-900 ring-2 ring-gold-300'

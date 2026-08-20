@@ -46,7 +46,7 @@ export function HomePage() {
   }, [events, backendMode])
 
   // 音声が認識されたら chat ページに遷移して送信
-  const { supported, isListening, interimText, error, start, stop } = useSpeechRecognition({
+  const { supported, isStandalone, isListening, interimText, error, start, stop } = useSpeechRecognition({
     onFinalResult: (text) => {
       sessionStorage.setItem('concierge.pendingMessage', text)
       navigate('/chat')
@@ -54,7 +54,7 @@ export function HomePage() {
   })
 
   const onMicClick = () => {
-    if (!supported) {
+    if (!supported || isStandalone) {
       navigate('/chat')
       return
     }
@@ -107,6 +107,11 @@ export function HomePage() {
         {!supported && (
           <p className="text-xs text-navy-500 mt-2">
             音声入力非対応のブラウザです。チャット画面からご入力ください。
+          </p>
+        )}
+        {supported && isStandalone && (
+          <p className="text-xs text-navy-500 mt-2">
+            ホーム画面に追加したアプリでは音声入力がご利用いただけません。チャット画面からご入力いただくか、Safariで直接開いてお試しください。
           </p>
         )}
       </div>

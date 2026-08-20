@@ -62,6 +62,13 @@ export function useSpeechRecognition({ lang = 'ja-JP', onFinalResult }: Options 
     typeof window !== 'undefined' &&
     !!(window.SpeechRecognition || window.webkitSpeechRecognition)
 
+  // iOSでホーム画面に追加したPWA（standaloneモード）ではWeb Speech APIがOS側の制約で
+  // 動作せず、start()するたびに 'aborted' を返し続ける（Safariのタブでは問題なく動く）
+  const isStandalone =
+    typeof window !== 'undefined' &&
+    (window.matchMedia?.('(display-mode: standalone)').matches ||
+      (window.navigator as Navigator & { standalone?: boolean }).standalone === true)
+
   const manualStopRef = useRef(false)
   const hasStartedRef = useRef(false)
   const permissionRetryRef = useRef(false)
@@ -69,6 +76,10 @@ export function useSpeechRecognition({ lang = 'ja-JP', onFinalResult }: Options 
   const start = (isRetry = false) => {
     if (!supported) {
       setError('このブラウザは音声認識に対応していません。Chrome / Edge / Safari でお試しください。')
+      return
+    }
+    if (isStandalone) {
+      setError('ホーム画面に追加したアプリでは音声入力がご利用いただけません。Safariで直接開いてお試しください。')
       return
     }
     setError(null)
@@ -150,5 +161,5 @@ export function useSpeechRecognition({ lang = 'ja-JP', onFinalResult }: Options 
 
   const clearError = () => setError(null)
 
-  return { supported, isListening, interimText, error, start, stop, clearError }
+  return { supported, isStandalone, isListening, interimText, error, start, stop, clearError }
 }
