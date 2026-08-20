@@ -63,9 +63,13 @@ export function useSpeechRecognition({ lang = 'ja-JP', onFinalResult }: Options 
     !!(window.SpeechRecognition || window.webkitSpeechRecognition)
 
   // iOSでホーム画面に追加したPWA（standaloneモード）ではWeb Speech APIがOS側の制約で
-  // 動作せず、start()するたびに 'aborted' を返し続ける（Safariのタブでは問題なく動く）
+  // 動作せず、start()するたびに 'aborted' を返し続ける（Safariのタブでは問題なく動く）。
+  // これはiOS（WKWebView）特有の制限で、AndroidのChromeではstandaloneでも問題なく動くため、
+  // iOS判定と組み合わせてこのケースだけを検知する
+  const isIOS =
+    typeof window !== 'undefined' && /iPad|iPhone|iPod/.test(window.navigator.userAgent)
   const isStandalone =
-    typeof window !== 'undefined' &&
+    isIOS &&
     (window.matchMedia?.('(display-mode: standalone)').matches ||
       (window.navigator as Navigator & { standalone?: boolean }).standalone === true)
 
