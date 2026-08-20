@@ -283,11 +283,21 @@ export function ChatPage() {
     )
     if (stagedDeletion) {
       const result = stagedDeletion.result as {
-        event_id: string
-        calendar: 'google' | 'outlook'
-        title: string
-        start: string
+        event_id?: string
+        calendar?: 'google' | 'outlook'
+        title?: string
+        start?: string
         location?: string
+        error?: string
+      }
+      // event_idの取り違え等でバックエンドが対象を特定できなかった場合、
+      // resultは {error: "..."} のみで title/start が欠けている。その場合は
+      // 空欄だらけの壊れた確認カードを出さず、エラーとして案内する
+      if (result.error || !result.event_id || !result.title || !result.start) {
+        return {
+          type: 'text',
+          text: '恐れ入ります、削除対象のご予定を特定できませんでした。お手数ですが、もう一度削除したいご予定をお知らせくださいませ。',
+        }
       }
       return {
         type: 'delete_confirm',
