@@ -632,23 +632,58 @@
     </div>
 
     <h3>方法C：今あるiCloudの予定を一度だけ移す</h3>
+    <p class="lede">Macをお持ちなら、カレンダーアプリの<span class="path">ファイル → 書き出す</span>から直接 <code>.ics</code> ファイルを保存できます（いちばん簡単です）。お持ちでない場合は、以下の手順でiPhoneまたはパソコンから同じものを用意できます。</p>
+
     <ol class="steps">
       <li>
         <div class="body">
-          <strong>パソコンでiCloud.comからカレンダーを書き出す</strong>
-          <p>iCloud.comのカレンダーを開き、対象カレンダーを共有設定から公開して、そのリンクをブラウザで開くと <code>.ics</code> ファイルが手に入ります。Macをお使いなら、カレンダーアプリの <span class="path">ファイル → 書き出す</span> のほうが簡単です。</p>
+          <strong>カレンダーを「公開」にして、共有リンクを取得する</strong>
+          <p>iPhone・パソコンいずれかで行います。どちらも所要1分程度です。</p>
+          <div class="twoup">
+            <div class="device">
+              <h4>iPhoneで行う場合</h4>
+              <ol>
+                <li>「カレンダー」アプリを開き、下部の<span class="ui">カレンダー</span>をタップ</li>
+                <li>書き出したいカレンダーの右側にある<span class="ui">ⓘ</span>をタップ</li>
+                <li><span class="ui">パブリックカレンダー</span>をオンにする</li>
+                <li><span class="ui">リンクを共有</span>をタップし、<span class="ui">コピー</span>を選ぶ</li>
+              </ol>
+            </div>
+            <div class="device">
+              <h4>パソコンで行う場合</h4>
+              <ol>
+                <li><a href="https://icloud.com/calendar">icloud.com/calendar</a> を開いてサインイン</li>
+                <li>左側のカレンダー名にポインタを合わせ、表示される<span class="ui">ⓘ</span>（情報）を選ぶ</li>
+                <li><span class="ui">パブリックカレンダー</span>をオンにする</li>
+                <li><span class="ui">コピー</span>を選んでリンクをコピー</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      </li>
+      <li>
+        <div class="body">
+          <strong>コピーしたリンクを書き換えて、ファイルとして保存する</strong>
+          <p>コピーされるのは <code>webcal://p12-caldav.icloud.com/published/2/…</code> のようなリンクです。メモ帳など好きな場所に一度貼り付け、先頭の <code>webcal://</code> だけを <code>https://</code> に手で書き換えてください。</p>
+          <p>書き換えたURLをブラウザの新しいタブのアドレス欄に貼り付けてEnterを押すと、<code>.ics</code> ファイルが自動でダウンロードされます。テキストがそのまま画面に表示された場合は、<span class="path">ファイル → 名前を付けて保存</span>（Windowsは<span class="ui">Ctrl+S</span>）で、拡張子を <code>.ics</code> にして保存してください。</p>
         </div>
       </li>
       <li>
         <div class="body">
           <strong>Googleカレンダーに読み込む</strong>
-          <p>Googleカレンダーの <span class="path">設定 → インポート/エクスポート → インポート</span> で <code>.ics</code> を選び、取り込み先のカレンダーを指定します。</p>
+          <p>Googleカレンダーの <span class="path">設定 → インポート/エクスポート → インポート</span> で、保存した <code>.ics</code> ファイルを選び、取り込み先のカレンダーを指定します。</p>
         </div>
       </li>
     </ol>
+
+    <div class="caution">
+      <span class="hd">終わったら「パブリックカレンダー」をオフに戻す</span>
+      <p>オンのままにしておくと、リンクを知っている人なら誰でもその予定を閲覧できてしまいます。<code>.ics</code> ファイルを保存し終えたら、iPhoneまたはiCloud.comの同じ画面で<span class="ui">パブリックカレンダー</span>をオフに戻してください（保存済みの <code>.ics</code> ファイルには影響しません）。</p>
+    </div>
+
     <div class="note">
       <span class="hd">仕上げに</span>
-      <p>方法Cは、実行した時点でiCloudに入っている予定を<strong>過去・未来問わずまとめて</strong>Googleカレンダーへコピーします。ただし<strong>一度きりのコピー</strong>のため、これ以降iPhone側で新しく作る予定は自動では連携されません。今後の分も秘書に見せ続けたい場合は、あわせて方法Aの設定もしておいてください。</p>
+      <p>方法Cは、書き出した時点でiCloudに入っている予定を<strong>過去・未来問わずまとめて</strong>Googleカレンダーへコピーします。ただし<strong>一度きりのコピー</strong>のため、これ以降iPhone側で新しく作る予定は自動では連携されません。今後の分も秘書に見せ続けたい場合は、あわせて方法Aの設定もしておいてください。</p>
     </div>
   </section>
 
