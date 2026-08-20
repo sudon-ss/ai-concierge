@@ -40,11 +40,13 @@ export function HomePage() {
   const events = backendMode ? realEvents : demoEvents
 
   const nextEvent = useMemo(() => {
-    const now = new Date().toISOString()
-    // 配列の並び順（APIの返却順・追加順）に依存せず、開始時刻が最も近い未来の予定を選ぶ
+    const now = Date.now()
+    // 配列の並び順（APIの返却順・追加順）に依存せず、開始時刻が最も近い未来の予定を選ぶ。
+    // GoogleはUTCオフセット付き、Outlookはオフセットなしの日時文字列を返すことがあり、
+    // 文字列のまま比較すると正しい順序にならないため、Dateとしてパースしてから比較する
     const upcoming = events
-      .filter((e) => e.start > now)
-      .sort((a, b) => a.start.localeCompare(b.start))
+      .filter((e) => new Date(e.start).getTime() > now)
+      .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
     // デモモードのみ、未来の予定が無い場合に先頭へフォールバックする（見た目のデモ用）
     return upcoming[0] ?? (backendMode ? undefined : events[0])
   }, [events, backendMode])

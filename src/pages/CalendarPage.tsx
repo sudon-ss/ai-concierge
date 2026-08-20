@@ -71,8 +71,12 @@ export function CalendarPage() {
 
   const events = backendMode ? (realEvents ?? []) : demoEvents
 
-  // APIの返却順・追加順に依存せず、常に開始時刻の昇順で表示する
-  const sortedEvents = [...events].sort((a, b) => a.start.localeCompare(b.start))
+  // APIの返却順・追加順に依存せず、常に開始時刻の昇順で表示する。GoogleはUTCオフセット付き、
+  // Outlookはオフセットなしの日時文字列を返すことがあり、文字列のまま比較すると正しい順序に
+  // ならないため、Dateとしてパースしてから比較する
+  const sortedEvents = [...events].sort(
+    (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime(),
+  )
 
   const grouped = sortedEvents.reduce<Record<string, typeof sortedEvents>>((acc, e) => {
     const k = groupByDay(e.start)
@@ -145,6 +149,18 @@ export function CalendarPage() {
         loadReal()
       })
       .catch(() => setSaveError('恐れ入ります、ご予定の削除に失敗いたしました。もう一度お試しくださいませ。'))
+  }
+
+  // Schedule一覧からモーダルを開かず直接削除する（メモ欄の「削除する」ボタンから）
+  const handleQuickDelete = (e: CalendarEvent) => {
+    if (!window.confirm(`「${e.title}」を削除してもよろしいでしょうか？`)) return
+    if (!backendMode) {
+      deleteEvent(e.id)
+      return
+    }
+    deleteEventApi({ calendar: calendarOf(e), event_id: e.id })
+      .then(() => loadReal())
+      .catch(() => window.alert('恐れ入ります、ご予定の削除に失敗いたしました。もう一度お試しくださいませ。'))
   }
 
   const handleReset = () => {
@@ -225,10 +241,19 @@ export function CalendarPage() {
           <ul className="space-y-2">
             {dayEvents.map((e) => (
               <li key={e.id}>
-                <button
-                  type="button"
+                {/* 内部に「削除する」ボタンを置くため、<button>ではなくクリック可能な<div>にする
+                    （<button>の中に<button>を置くのは無効なHTMLでクリックが効かなくなる） */}
+                <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() => openEdit(e)}
-                  className="w-full card p-3 text-left hover:border-gold-300 transition"
+                  onKeyDown={(ev) => {
+                    if (ev.key === 'Enter' || ev.key === ' ') {
+                      ev.preventDefault()
+                      openEdit(e)
+                    }
+                  }}
+                  className="w-full card p-3 text-left hover:border-gold-300 transition cursor-pointer"
                 >
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-mono text-sm text-navy-700 tabular-nums">
@@ -238,8 +263,20 @@ export function CalendarPage() {
                     {e.location && <span className="text-xs text-navy-600">📍{e.location}</span>}
                   </div>
                   <p className="font-medium text-navy-900 mt-1">{e.title}</p>
-                  <MemoBlock event={e} />
-                </button>
+                  <div className="flex items-center justify-between gap-2 mt-1">
+                    <MemoBlock event={e} />
+                    <button
+                      type="button"
+                      onClick={(ev) => {
+                        ev.stopPropagation()
+                        handleQuickDelete(e)
+                      }}
+                      className="shrink-0 text-xs text-red-500 hover:text-red-700 underline-offset-2 hover:underline"
+                    >
+                      削除する
+                    </button>
+                  </div>
+                </div>
               </li>
             ))}
           </ul>

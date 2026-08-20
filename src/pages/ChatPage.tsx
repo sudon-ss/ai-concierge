@@ -779,14 +779,10 @@ export function ChatPage() {
       )
 
     if (hasBackend() && getSession()) {
-      if (!calendar) {
-        markFailed()
-        return
-      }
-      // 'both'（Google+Outlook両方に登録済みの重複予定）の場合も、削除対象は
-      // event_idに紐づくcopies全件からサーバー側で解決されるため、calendarの値自体は
-      // フォールバック用でしかなく実際には使われない。'google'を渡しておけばよい
-      const target = calendar === 'both' ? 'google' : calendar
+      // 削除対象はevent_idに紐づくcopies全件からサーバー側で解決されるため、
+      // calendarの値自体はフォールバック用でしかなく実際には使われない。
+      // 'both'（重複統合済み）や未取得の場合も含め、常に'google'にしておけばよい
+      const target = calendar && calendar !== 'both' ? calendar : 'google'
       deleteEventApi({ calendar: target, event_id: eventId }).then(markDone).catch(markFailed)
       return
     }
