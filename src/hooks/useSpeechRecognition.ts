@@ -62,12 +62,15 @@ export function useSpeechRecognition({ lang = 'ja-JP', onFinalResult }: Options 
     typeof window !== 'undefined' &&
     !!(window.SpeechRecognition || window.webkitSpeechRecognition)
 
+  const manualStopRef = useRef(false)
+
   const start = () => {
     if (!supported) {
-      setError('このブラウザは音声認識に対応していないにゃ。Chrome / Edge / Safari で試してにゃ。')
+      setError('このブラウザは音声認識に対応していません。Chrome / Edge / Safari でお試しください。')
       return
     }
     setError(null)
+    manualStopRef.current = false
     const Recognition = (window.SpeechRecognition || window.webkitSpeechRecognition) as SpeechRecognitionCtor
     const r = new Recognition()
     r.lang = lang
@@ -80,11 +83,18 @@ export function useSpeechRecognition({ lang = 'ja-JP', onFinalResult }: Options 
       setInterimText('')
     }
     r.onerror = (e) => {
+      // iOS Safariは停止ボタンによる正常な中断でも 'aborted' を返すことがあるため、
+      // 自分でstop()を呼んだ直後の 'aborted' はエラー表示しない
+      if (e.error === 'aborted' && manualStopRef.current) {
+        setIsListening(false)
+        return
+      }
       const map: Record<string, string> = {
-        'not-allowed': 'マイクが許可されていないにゃ。ブラウザの設定で許可してにゃ。',
-        'no-speech': '声が聞こえなかったにゃ。もう一度話しかけてにゃ。',
-        'audio-capture': 'マイクが見つからないにゃ。',
-        'network': 'ネットワークエラーにゃ。',
+        'not-allowed': 'マイクが許可されていません。ブラウザの設定で許可してください。',
+        'no-speech': '声が聞こえませんでした。もう一度お話しください。',
+        'audio-capture': 'マイクが見つかりません。',
+        'network': 'ネットワークエラーが発生しました。',
+        'aborted': '音声認識が中断されました。お手数ですが、もう一度マイクボタンをお試しください。',
       }
       setError(map[e.error] || `音声認識エラー: ${e.error}`)
       setIsListening(false)
@@ -113,12 +123,13 @@ export function useSpeechRecognition({ lang = 'ja-JP', onFinalResult }: Options 
     try {
       r.start()
     } catch {
-      setError('音声認識の起動に失敗したにゃ。')
+      setError('音声認識の起動に失敗しました。')
       setIsListening(false)
     }
   }
 
   const stop = () => {
+    manualStopRef.current = true
     recognitionRef.current?.stop()
   }
 
