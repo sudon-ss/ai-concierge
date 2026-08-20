@@ -1,5 +1,6 @@
 import asyncio
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, field_validator
@@ -13,6 +14,23 @@ router = APIRouter(prefix="/api/events", tags=["events"])
 
 MAX_TENTATIVE_SLOTS = 5
 
+JST = ZoneInfo("Asia/Tokyo")
+
+
+def _sort_key(start: str | None) -> datetime:
+    """開始時刻を比較可能なawareなdatetimeに正規化する。
+    Googleはオフセット付き（+09:00）、Outlookはオフセットなしのdatetime文字列を返すなど
+    プロバイダによって表記形式が異なり、文字列の単純比較では並び順が崩れることがあるため、
+    実際の日時としてパースしてから比較する。
+    """
+    if not start:
+        return datetime.min.replace(tzinfo=JST)
+    try:
+        dt = datetime.fromisoformat(start.replace("Z", "+00:00"))
+    except ValueError:
+        return datetime.min.replace(tzinfo=JST)
+    return dt if dt.tzinfo else dt.replace(tzinfo=JST)
+
 
 @router.get("")
 async def list_events_endpoint(days: int = 30, user: SessionUser = Depends(get_current_user)):
@@ -25,7 +43,7 @@ async def list_events_endpoint(days: int = 30, user: SessionUser = Depends(get_c
     adapters = await get_connected_adapters(user.user_id)
     events_lists = await asyncio.gather(*[a.list_events(now, time_max) for a in adapters.values()])
     events = dedupe_events([ev for lst in events_lists for ev in lst])
-    events.sort(key=lambda e: e["start"] or "")
+    events.sort(key=lambda e: _sort_key(e["start"]))
     return events
 
 

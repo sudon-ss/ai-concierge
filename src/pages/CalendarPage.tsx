@@ -70,7 +70,10 @@ export function CalendarPage() {
 
   const events = backendMode ? (realEvents ?? []) : demoEvents
 
-  const grouped = events.reduce<Record<string, typeof events>>((acc, e) => {
+  // APIの返却順・追加順に依存せず、常に開始時刻の昇順で表示する
+  const sortedEvents = [...events].sort((a, b) => a.start.localeCompare(b.start))
+
+  const grouped = sortedEvents.reduce<Record<string, typeof sortedEvents>>((acc, e) => {
     const k = groupByDay(e.start)
     if (!acc[k]) acc[k] = []
     acc[k].push(e)

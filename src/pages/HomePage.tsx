@@ -41,8 +41,12 @@ export function HomePage() {
 
   const nextEvent = useMemo(() => {
     const now = new Date().toISOString()
+    // 配列の並び順（APIの返却順・追加順）に依存せず、開始時刻が最も近い未来の予定を選ぶ
+    const upcoming = events
+      .filter((e) => e.start > now)
+      .sort((a, b) => a.start.localeCompare(b.start))
     // デモモードのみ、未来の予定が無い場合に先頭へフォールバックする（見た目のデモ用）
-    return events.find((e) => e.start > now) ?? (backendMode ? undefined : events[0])
+    return upcoming[0] ?? (backendMode ? undefined : events[0])
   }, [events, backendMode])
 
   // 音声が認識されたら chat ページに遷移して送信
