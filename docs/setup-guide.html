@@ -666,7 +666,17 @@
         <div class="body">
           <strong>コピーしたリンクを書き換えて、ファイルとして保存する</strong>
           <p>コピーされるのは <code>webcal://p12-caldav.icloud.com/published/2/…</code> のようなリンクです。メモ帳など好きな場所に一度貼り付け、先頭の <code>webcal://</code> だけを <code>https://</code> に手で書き換えてください。</p>
-          <p>書き換えたURLをブラウザの新しいタブのアドレス欄に貼り付けてEnterを押すと、<code>.ics</code> ファイルが自動でダウンロードされます。テキストがそのまま画面に表示された場合は、<span class="path">ファイル → 名前を付けて保存</span>（Windowsは<span class="ui">Ctrl+S</span>）で、拡張子を <code>.ics</code> にして保存してください。</p>
+          <p>書き換えたURLをブラウザの新しいタブのアドレス欄に貼り付けてEnterを押すと、多くの場合（特にChrome）は <code>.ics</code> ファイルが自動でダウンロードされます。この場合は次の手順に進んでください。</p>
+          <p>まれに、ダウンロードされずにテキストがそのまま画面に表示されることがあります。その場合は次の手順で保存してください。</p>
+          <ol class="plain">
+            <li>表示された<strong>ページ本体（アドレス欄ではなく、白い画面の部分）</strong>をクリックしてから <span class="ui">Ctrl+A</span>（全選択）→ <span class="ui">Ctrl+C</span>（コピー）</li>
+            <li>メモ帳を開いて <span class="ui">Ctrl+V</span> で貼り付け</li>
+            <li><span class="path">ファイル → 名前を付けて保存</span>で、<strong>「ファイルの種類」を必ず「すべてのファイル」に変更</strong>してから、ファイル名を <code>calendar.ics</code> にして保存（「テキスト文書」のままだと正しく保存できません）</li>
+          </ol>
+          <div class="caution">
+            <span class="hd">保存前の確認</span>
+            <p>できあがったファイルをメモ帳で開き、1行目が <code>BEGIN:VCALENDAR</code> から始まっていることを確認してください。もし <code>https://</code> から始まるURLの文字列だけが入っている場合は、URLをコピーしただけで中身を取得できていません。もう一度ブラウザでURLを開き直してください。</p>
+          </div>
         </div>
       </li>
       <li>
