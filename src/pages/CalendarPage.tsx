@@ -1,11 +1,17 @@
 import { useEffect, useState } from 'react'
-import { Plus, RotateCcw, RefreshCw, Cloud } from 'lucide-react'
+import { Plus, RotateCcw, RefreshCw, Cloud, List, CalendarDays } from 'lucide-react'
+import clsx from 'clsx'
 import { useProfile } from '../hooks/useProfile'
 import { CalendarBadge } from '../components/CalendarBadge'
 import { MemoBlock } from '../components/MemoBlock'
 import { EventEditModal } from '../components/EventEditModal'
+import { CalendarGridView, type GridViewMode } from '../components/CalendarGridView'
 import type { CalendarEvent } from '../types'
 import { deleteEventApi, getSession, hasBackend, listEvents, updateEventApi } from '../lib/api'
+
+type ViewMode = 'list' | GridViewMode
+
+const VIEW_LABELS: Record<ViewMode, string> = { list: '一覧', day: '日', week: '週', month: '月' }
 
 const groupByDay = (iso: string) =>
   new Date(iso).toLocaleDateString('ja-JP', {
@@ -37,6 +43,8 @@ export function CalendarPage() {
   const [editing, setEditing] = useState<CalendarEvent | null>(null)
   const [isNew, setIsNew] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<ViewMode>('list')
+  const [gridDate, setGridDate] = useState(new Date())
 
   // 実バックエンド接続時は、Phase 0のデモデータではなく実際に連携済みのカレンダーを表示する
   const backendMode = hasBackend() && Boolean(getSession())
@@ -219,6 +227,23 @@ export function CalendarPage() {
         </div>
       </div>
 
+      <div className="inline-flex items-center gap-0.5 bg-navy-50 rounded-lg p-0.5 self-start">
+        {(['list', 'day', 'week', 'month'] as ViewMode[]).map((v) => (
+          <button
+            key={v}
+            type="button"
+            onClick={() => setViewMode(v)}
+            className={clsx(
+              'flex items-center gap-1 text-xs font-medium rounded-md px-2.5 py-1 transition',
+              viewMode === v ? 'bg-white text-navy-900 shadow-sm' : 'text-navy-500 hover:text-navy-700',
+            )}
+          >
+            {v === 'list' ? <List size={12} /> : <CalendarDays size={12} />}
+            {VIEW_LABELS[v]}
+          </button>
+        ))}
+      </div>
+
       {backendMode && (
         <p className="text-[11px] text-navy-400 -mt-3">
           ご予定の新規登録は「チャット」タブからお申し付けください。変更・削除はこの一覧からも行えます。
@@ -227,7 +252,21 @@ export function CalendarPage() {
 
       {loadError && <div className="card p-4 text-center text-red-600 text-sm">{loadError}</div>}
 
-      {!loading && events.length === 0 && !loadError && (
+      {viewMode !== 'list' && (
+        <CalendarGridView
+          mode={viewMode}
+          currentDate={gridDate}
+          events={events}
+          onDateChange={setGridDate}
+          onEventClick={openEdit}
+          onDayClick={(d) => {
+            setGridDate(d)
+            setViewMode('day')
+          }}
+        />
+      )}
+
+      {viewMode === 'list' && !loading && events.length === 0 && !loadError && (
         <div className="card p-6 text-center text-navy-500 text-sm">
           {backendMode
             ? '直近のご予定はございません。'
@@ -235,7 +274,7 @@ export function CalendarPage() {
         </div>
       )}
 
-      {Object.entries(grouped).map(([day, dayEvents]) => (
+      {viewMode === 'list' && Object.entries(grouped).map(([day, dayEvents]) => (
         <section key={day}>
           <h3 className="text-sm font-semibold text-navy-700 mb-2 serif">{day}</h3>
           <ul className="space-y-2">
