@@ -125,9 +125,12 @@ function EventBlock({
     Math.max(startMinutes + 20, end.getHours() * 60 + end.getMinutes() - dayStartMinutes),
   )
   const top = (startMinutes / 60) * HOUR_HEIGHT
-  const height = ((endMinutes - startMinutes) / 60) * HOUR_HEIGHT
+  const height = Math.max(((endMinutes - startMinutes) / 60) * HOUR_HEIGHT, 20)
   const widthPct = 100 / cols
   const fmtT = (d: Date) => d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
+  // 時刻とタイトルを2行に分けると、30分など短い予定では高さが足りずタイトルが見切れるため、
+  // 一定の高さに満たない場合は「時刻 タイトル」を1行にまとめて表示する
+  const isShort = height < 34
 
   return (
     <button
@@ -139,7 +142,7 @@ function EventBlock({
       title={`${event.title}（${fmtT(start)}〜${fmtT(end)}）`}
       style={{
         top,
-        height: Math.max(height, 18),
+        height,
         left: `calc(${col * widthPct}% + 2px)`,
         width: `calc(${widthPct}% - 4px)`,
       }}
@@ -149,8 +152,16 @@ function EventBlock({
         SOURCE_BLOCK[eventSourceKey(event)],
       )}
     >
-      {!dense && <div className="text-[9px] opacity-70 tabular-nums">{fmtT(start)}</div>}
-      <div className={clsx('font-medium truncate', dense ? 'text-[9px]' : 'text-[11px]')}>{event.title}</div>
+      {isShort ? (
+        <div className={clsx('font-medium truncate', dense ? 'text-[9px]' : 'text-[10px]')}>
+          <span className="opacity-70 tabular-nums">{fmtT(start)}</span> {event.title}
+        </div>
+      ) : (
+        <>
+          {!dense && <div className="text-[9px] opacity-70 tabular-nums">{fmtT(start)}</div>}
+          <div className={clsx('font-medium truncate', dense ? 'text-[9px]' : 'text-[11px]')}>{event.title}</div>
+        </>
+      )}
     </button>
   )
 }
@@ -189,7 +200,8 @@ function HourGrid({
                   isToday ? 'text-gold-700 font-semibold' : 'text-navy-500',
                 )}
               >
-                {WEEKDAY_JA[date.getDay()]} {date.getDate()}
+                {/* 週表示は列が狭いため「7(月)」、日表示は列が1つだけなので「7日(月)」と分かりやすく書く */}
+                {dense ? `${date.getDate()}(${WEEKDAY_JA[date.getDay()]})` : `${date.getDate()}日(${WEEKDAY_JA[date.getDay()]})`}
               </div>
             )
           })}
@@ -201,13 +213,14 @@ function HourGrid({
       <div ref={scrollRef} className="overflow-y-auto overflow-x-auto" style={{ maxHeight: 420 }}>
         <div className="flex" style={{ minWidth: dense ? columns.length * 46 + 40 : undefined }}>
           <div className="shrink-0 w-10 bg-navy-50/30 border-r border-navy-100">
+            {/* 各枠は必ずHOUR_HEIGHTぶんだけ積み上げる（負のマージンで見た目を調整すると、
+                24個分の負のマージンが積算されてイベント側の絶対配置との間に大きなズレが生じるため、
+                枠の高さ自体は変えず、中のテキストだけ絶対配置でグリッド線に合わせる） */}
             {hours.map((h) => (
-              <div
-                key={h}
-                style={{ height: HOUR_HEIGHT }}
-                className="text-[10px] text-navy-400 text-right pr-1 -mt-[6px] tabular-nums"
-              >
-                {h}:00
+              <div key={h} style={{ height: HOUR_HEIGHT }} className="relative">
+                <span className="absolute right-1 -top-[7px] text-[10px] text-navy-400 tabular-nums">
+                  {h}:00
+                </span>
               </div>
             ))}
           </div>
