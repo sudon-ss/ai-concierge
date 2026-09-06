@@ -83,11 +83,23 @@ async def get_free_slots(
 
     time_min = _parse_dt(date_from)
     time_max = _parse_dt(date_to)
+    if time_max <= time_min:
+        return {
+            "slots": [],
+            "tentative_slots": [],
+            "searched_until": date_from,
+            "note": f"date_from（{date_from}）がdate_to（{date_to}）以降になっており、検索できません。範囲を確認してください",
+        }
+
     is_broad = (time_max - time_min) > timedelta(days=BROAD_RANGE_DAYS)
     max_slots = BROAD_MAX_SLOTS if is_broad else NARROW_MAX_SLOTS
-    min_gap = timedelta(days=BROAD_MIN_GAP_DAYS) if is_broad else timedelta(0)
-    duration = timedelta(minutes=duration_minutes)
     allowed_weekdays = {WEEKDAY_CODES[w] for w in weekdays if w in WEEKDAY_CODES} if weekdays else None
+    # 曜日を絞り込み済みの場合、曜日指定自体が既に十分な間引きになっている
+    # （例:「月曜火曜のどちらか」で連続する2日を偏り防止のために弾くと、
+    # せっかく指定した候補が消えてしまう）ため、min_gapによる追加の間引きは行わない
+    min_gap = timedelta(days=BROAD_MIN_GAP_DAYS) if (is_broad and allowed_weekdays is None) else timedelta(0)
+    # 予定として意味を成さない長さ（0以下）が渡された場合は既定の60分に丸める
+    duration = timedelta(minutes=duration_minutes) if duration_minutes > 0 else timedelta(minutes=60)
 
     results = await asyncio.gather(*[a.list_events(time_min, time_max) for a in adapters.values()])
 
@@ -163,7 +175,15 @@ async def get_free_slots(
         else:
             slots.append(entry)
             last_picked = cursor
-        cursor = slot_end
+
+        if allowed_weekdays is not None:
+            # 曜日を絞り込んでいる場合、同じ日から複数枠を拾うと結局「月曜だけ何件も」
+            # のように偏るので、1日1件だけ拾って次の対象日へ進める
+            cursor = (cursor + timedelta(days=1)).replace(
+                hour=day_start_h, minute=day_start_m, second=0, microsecond=0
+            )
+        else:
+            cursor = slot_end
 
     searched_until = min(cursor, time_max)
     note = (
