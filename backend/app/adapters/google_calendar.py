@@ -45,6 +45,8 @@ async def list_google_calendars(access_token: str) -> list[dict]:
 
 
 def _to_common(ev: dict, calendar_id: str | None = None) -> dict:
+    # 終日予定は dateTime が無く date（時刻・タイムゾーン無しの日付文字列）だけが入る
+    all_day = "date" in ev.get("start", {})
     start = ev.get("start", {}).get("dateTime") or ev.get("start", {}).get("date")
     end = ev.get("end", {}).get("dateTime") or ev.get("end", {}).get("date")
     return {
@@ -54,6 +56,7 @@ def _to_common(ev: dict, calendar_id: str | None = None) -> dict:
         "end": end,
         "location": ev.get("location"),
         "source": "google",
+        "all_day": all_day,
         # 削除時にどのカレンダーへ問い合わせるか判別するために保持する
         "calendar_id": calendar_id,
     }
