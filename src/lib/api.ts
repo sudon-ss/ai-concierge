@@ -92,10 +92,18 @@ export function clearChatHistory() {
   return apiFetch<{ ok: boolean }>('/api/chat/history', { method: 'DELETE' })
 }
 
+export interface ToolStartInfo {
+  name: string
+  /** このターン内で同じツールが呼ばれた回数（2以上なら再検索・やり直し） */
+  callIndex: number
+  iteration: number
+  maxIterations: number
+}
+
 export async function sendChatMessageStream(
   message: string,
   onDelta: (text: string) => void,
-  onToolStart?: (toolName: string) => void,
+  onToolStart?: (info: ToolStartInfo) => void,
   profile?: 'ceo' | 'director' | 'cfo',
 ): Promise<ChatApiResponse> {
   if (!API_BASE) throw new Error('VITE_API_BASE_URL が設定されていません')
@@ -136,7 +144,12 @@ export async function sendChatMessageStream(
     if (eventType === 'delta') {
       onDelta(parsed.text as string)
     } else if (eventType === 'tool_start') {
-      onToolStart?.(parsed.name as string)
+      onToolStart?.({
+        name: parsed.name as string,
+        callIndex: (parsed.call_index as number) ?? 1,
+        iteration: (parsed.iteration as number) ?? 1,
+        maxIterations: (parsed.max_iterations as number) ?? 1,
+      })
     } else if (eventType === 'done') {
       finalPayload = parsed as unknown as ChatApiResponse
     } else if (eventType === 'error') {
