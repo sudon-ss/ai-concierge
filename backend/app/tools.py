@@ -1,5 +1,6 @@
 import asyncio
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from .calendar_service import (
     dedupe_events,
@@ -11,6 +12,20 @@ from .calendar_service import (
 from .database import get_supabase
 
 IMPORTANT_KEYWORDS = ["持っていく", "準備", "印刷", "届ける", "提出", "用意", "締め切り", "締切"]
+
+JST = ZoneInfo("Asia/Tokyo")
+
+
+def _parse_dt(value: str) -> datetime:
+    """Claudeがツールに渡すISO8601日時文字列をパースする。タイムゾーンが省略されている
+    場合はJST（Asia/Tokyo）を補う。これを怠ると、下流でdatetime.isoformat()した際に
+    オフセットの無い文字列がGoogle/Outlookのカレンダーにそのまま渡ってしまい、
+    「timeMin/timeMaxにタイムゾーンが無い」として400 Bad Requestで拒否されたり、
+    最悪の場合は意図しない時刻で登録されたりする。ISO8601はタイムゾーン省略を許容する
+    仕様のため、通常のfromisoformatだけでは防げない。
+    """
+    dt = datetime.fromisoformat(value)
+    return dt if dt.tzinfo else dt.replace(tzinfo=JST)
 
 
 def judge_memo_importance(text: str) -> dict:
@@ -51,8 +66,8 @@ async def get_free_slots(user_id: str, date_from: str, date_to: str) -> dict:
     if not adapters:
         return {"slots": [], "tentative_slots": [], "searched_until": date_from, "note": "カレンダーが未連携です"}
 
-    time_min = datetime.fromisoformat(date_from)
-    time_max = datetime.fromisoformat(date_to)
+    time_min = _parse_dt(date_from)
+    time_max = _parse_dt(date_to)
     is_broad = (time_max - time_min) > timedelta(days=BROAD_RANGE_DAYS)
     max_slots = BROAD_MAX_SLOTS if is_broad else NARROW_MAX_SLOTS
     min_gap = timedelta(days=BROAD_MIN_GAP_DAYS) if is_broad else timedelta(0)
@@ -156,7 +171,7 @@ async def create_event(
     results = []
     for adapter in adapters:
         ev = await adapter.create_event(
-            title=title, start=datetime.fromisoformat(start), end=datetime.fromisoformat(end), location=location
+            title=title, start=_parse_dt(start), end=_parse_dt(end), location=location
         )
         sb.table("events").insert(
             {
@@ -192,8 +207,8 @@ async def hold_tentative_slots(
     async def hold_one(adapter, slot: dict) -> dict:
         return await adapter.create_event(
             title=f"[仮] {title}",
-            start=datetime.fromisoformat(slot["start"]),
-            end=datetime.fromisoformat(slot["end"]),
+            start=_parse_dt(slot["start"]),
+            end=_parse_dt(slot["end"]),
         )
 
     # 枠数×カレンダー数を直列で作ると体感が遅いため並列で登録する
@@ -264,7 +279,7 @@ async def find_events(user_id: str, date_from: str, date_to: str) -> dict:
     """既存の予定を検索する。予定の変更にはevent_idが必要なため、
     reschedule_eventを呼ぶ前にこのツールで対象を特定する。
     """
-    events = await _load_events(user_id, datetime.fromisoformat(date_from), datetime.fromisoformat(date_to))
+    events = await _load_events(user_id, _parse_dt(date_from), _parse_dt(date_to))
     if not events:
         return {"events": [], "note": f"{date_from}から{date_to}の間に予定はありません"}
     # copiesは内部管理用（同時変更のため）なのでClaudeには渡さず、件数だけ伝える
@@ -315,8 +330,8 @@ async def reschedule_event(
     その全コピーを同時に動かす（片方だけ動いて食い違うのを防ぐ）。
     """
     target = await _find_target_event(user_id, event_id)
-    start = datetime.fromisoformat(new_start)
-    end = datetime.fromisoformat(new_end)
+    start = _parse_dt(new_start)
+    end = _parse_dt(new_end)
     copies = target.get("copies") or [{"id": event_id, "calendar_id": None, "source": calendar}]
     adapters = await _adapters_for_copies(user_id, copies)
 
@@ -404,8 +419,8 @@ async def update_event_fields(
     copies = target.get("copies") or [{"id": event_id, "calendar_id": None, "source": calendar}]
     adapters = await _adapters_for_copies(user_id, copies)
 
-    start_dt = datetime.fromisoformat(start) if start else None
-    end_dt = datetime.fromisoformat(end) if end else None
+    start_dt = _parse_dt(start) if start else None
+    end_dt = _parse_dt(end) if end else None
 
     async def update_one(copy: dict) -> dict | None:
         adapter = adapters.get(copy["source"])
@@ -502,8 +517,8 @@ TOOLS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "date_from": {"type": "string", "description": "検索開始日時 ISO8601"},
-                "date_to": {"type": "string", "description": "検索終了日時 ISO8601"},
+                "date_from": {"type": "string", "description": "検索開始日時 ISO8601（例: 2026-10-01T18:00:00+09:00、必ずタイムゾーンオフセットを含めること）"},
+                "date_to": {"type": "string", "description": "検索終了日時 ISO8601（必ずタイムゾーンオフセットを含めること）"},
             },
             "required": ["date_from", "date_to"],
         },
@@ -516,8 +531,8 @@ TOOLS = [
             "properties": {
                 "calendar": {"type": "string", "enum": ["google", "outlook"]},
                 "title": {"type": "string"},
-                "start": {"type": "string", "description": "ISO8601"},
-                "end": {"type": "string", "description": "ISO8601"},
+                "start": {"type": "string", "description": "ISO8601（必ずタイムゾーンオフセットを含めること。例: 2026-10-01T18:00:00+09:00）"},
+                "end": {"type": "string", "description": "ISO8601（必ずタイムゾーンオフセットを含めること）"},
                 "location": {"type": "string"},
                 "memo": {"type": "string", "description": "準備物などのメモ（任意）"},
             },
@@ -533,8 +548,8 @@ TOOLS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "date_from": {"type": "string", "description": "検索開始日時 ISO8601"},
-                "date_to": {"type": "string", "description": "検索終了日時 ISO8601"},
+                "date_from": {"type": "string", "description": "検索開始日時 ISO8601（例: 2026-10-01T18:00:00+09:00、必ずタイムゾーンオフセットを含めること）"},
+                "date_to": {"type": "string", "description": "検索終了日時 ISO8601（必ずタイムゾーンオフセットを含めること）"},
             },
             "required": ["date_from", "date_to"],
         },
@@ -551,8 +566,8 @@ TOOLS = [
             "properties": {
                 "calendar": {"type": "string", "enum": ["google", "outlook"]},
                 "event_id": {"type": "string", "description": "find_eventsで取得したevent_id"},
-                "new_start": {"type": "string", "description": "ISO8601"},
-                "new_end": {"type": "string", "description": "ISO8601"},
+                "new_start": {"type": "string", "description": "ISO8601（必ずタイムゾーンオフセットを含めること）"},
+                "new_end": {"type": "string", "description": "ISO8601（必ずタイムゾーンオフセットを含めること）"},
             },
             "required": ["calendar", "event_id", "new_start", "new_end"],
         },
