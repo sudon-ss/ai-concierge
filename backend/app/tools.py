@@ -212,7 +212,12 @@ async def create_event(
     location: str | None = None,
     memo: str | None = None,
 ) -> list[dict]:
-    """登録先として選択されている全カレンダー（最大3件）に同時登録する。"""
+    """登録先として選択されている全カレンダー（最大3件）に同時登録する。
+    一部のカレンダーへの登録だけが失敗しても（例: 読み取り専用の購読カレンダーを
+    誤って登録先に選んでいた場合）、成功した分は失わずに返す。全滅した場合のみ
+    例外を送出する。以前は1つでも失敗すると成功分ごと失われ、実際にはカレンダー上に
+    作成された予定が宙に浮いて残ってしまっていた。
+    """
     adapters = await get_write_adapters(user_id, calendar)
     if not adapters:
         raise ValueError(f"{calendar} が連携されていません")
@@ -220,10 +225,15 @@ async def create_event(
     judged = judge_memo_importance(memo) if memo else {"priority": "normal", "flagged": False}
     sb = get_supabase()
     results = []
+    errors: list[str] = []
     for adapter in adapters:
-        ev = await adapter.create_event(
-            title=title, start=_parse_dt(start), end=_parse_dt(end), location=location
-        )
+        try:
+            ev = await adapter.create_event(
+                title=title, start=_parse_dt(start), end=_parse_dt(end), location=location
+            )
+        except Exception as exc:  # noqa: BLE001
+            errors.append(str(exc))
+            continue
         sb.table("events").insert(
             {
                 "user_id": user_id,
@@ -239,6 +249,12 @@ async def create_event(
             }
         ).execute()
         results.append(ev)
+
+    if not results:
+        raise ValueError(
+            f"{calendar}への登録にすべて失敗しました。書き込み権限の無いカレンダー"
+            f"（購読カレンダー等）が登録先に選ばれている可能性があります: {'; '.join(errors)}"
+        )
     return results
 
 
@@ -250,22 +266,37 @@ async def hold_tentative_slots(
     登録先が複数選択されていれば、その全カレンダーに押さえる。
     確定・キャンセル時に release_tentative_slots() で消せるよう、
     削除に必要な calendar_id を含めて返す。
+
+    登録先カレンダーが複数ある場合、1つが失敗しても（例: 読み取り専用の
+    購読カレンダーを誤って登録先に選んでいた場合）他の成功分は失わない。
+    以前はasyncio.gatherが最初の例外で全体を打ち切る作りだったため、
+    実際には書き込みに成功していたカレンダーの分まで「失敗」として
+    報告してしまい、しかもその分は追跡されず宙に浮いて残っていた。
     """
     adapters = await get_write_adapters(user_id, calendar)
     if not adapters:
         raise ValueError(f"{calendar} が連携されていません")
 
-    async def hold_one(adapter, slot: dict) -> dict:
-        return await adapter.create_event(
-            title=f"[仮] {title}",
-            start=_parse_dt(slot["start"]),
-            end=_parse_dt(slot["end"]),
-        )
+    async def hold_one(adapter, slot: dict) -> dict | Exception:
+        try:
+            return await adapter.create_event(
+                title=f"[仮] {title}",
+                start=_parse_dt(slot["start"]),
+                end=_parse_dt(slot["end"]),
+            )
+        except Exception as exc:  # noqa: BLE001
+            return exc
 
     # 枠数×カレンダー数を直列で作ると体感が遅いため並列で登録する
-    return list(
-        await asyncio.gather(*[hold_one(a, s) for s in slots for a in adapters])
-    )
+    raw = await asyncio.gather(*[hold_one(a, s) for s in slots for a in adapters])
+    results = [r for r in raw if not isinstance(r, Exception)]
+    if not results:
+        errors = {str(r) for r in raw if isinstance(r, Exception)}
+        raise ValueError(
+            f"{calendar}への仮押さえにすべて失敗しました。書き込み権限の無いカレンダー"
+            f"（購読カレンダー等）が登録先に選ばれている可能性があります: {'; '.join(errors)}"
+        )
+    return results
 
 
 async def release_tentative_slots(user_id: str, *, items: list[dict]) -> int:
