@@ -363,6 +363,8 @@ export interface CalendarOption {
   id: string
   name: string
   primary: boolean
+  /** falseの場合、URL購読で取り込んだ他社カレンダー等の読み取り専用カレンダー。登録先には選べない */
+  writable: boolean
 }
 
 export interface CalendarSelectionState {

@@ -83,11 +83,23 @@ async def get_free_slots(
 
     time_min = _parse_dt(date_from)
     time_max = _parse_dt(date_to)
+    if time_max <= time_min:
+        return {
+            "slots": [],
+            "tentative_slots": [],
+            "searched_until": date_from,
+            "note": f"date_from（{date_from}）がdate_to（{date_to}）以降になっており、検索できません。範囲を確認してください",
+        }
+
     is_broad = (time_max - time_min) > timedelta(days=BROAD_RANGE_DAYS)
     max_slots = BROAD_MAX_SLOTS if is_broad else NARROW_MAX_SLOTS
-    min_gap = timedelta(days=BROAD_MIN_GAP_DAYS) if is_broad else timedelta(0)
-    duration = timedelta(minutes=duration_minutes)
     allowed_weekdays = {WEEKDAY_CODES[w] for w in weekdays if w in WEEKDAY_CODES} if weekdays else None
+    # 曜日を絞り込み済みの場合、曜日指定自体が既に十分な間引きになっている
+    # （例:「月曜火曜のどちらか」で連続する2日を偏り防止のために弾くと、
+    # せっかく指定した候補が消えてしまう）ため、min_gapによる追加の間引きは行わない
+    min_gap = timedelta(days=BROAD_MIN_GAP_DAYS) if (is_broad and allowed_weekdays is None) else timedelta(0)
+    # 予定として意味を成さない長さ（0以下）が渡された場合は既定の60分に丸める
+    duration = timedelta(minutes=duration_minutes) if duration_minutes > 0 else timedelta(minutes=60)
 
     results = await asyncio.gather(*[a.list_events(time_min, time_max) for a in adapters.values()])
 
@@ -163,7 +175,15 @@ async def get_free_slots(
         else:
             slots.append(entry)
             last_picked = cursor
-        cursor = slot_end
+
+        if allowed_weekdays is not None:
+            # 曜日を絞り込んでいる場合、同じ日から複数枠を拾うと結局「月曜だけ何件も」
+            # のように偏るので、1日1件だけ拾って次の対象日へ進める
+            cursor = (cursor + timedelta(days=1)).replace(
+                hour=day_start_h, minute=day_start_m, second=0, microsecond=0
+            )
+        else:
+            cursor = slot_end
 
     searched_until = min(cursor, time_max)
     note = (
@@ -192,7 +212,12 @@ async def create_event(
     location: str | None = None,
     memo: str | None = None,
 ) -> list[dict]:
-    """登録先として選択されている全カレンダー（最大3件）に同時登録する。"""
+    """登録先として選択されている全カレンダー（最大3件）に同時登録する。
+    一部のカレンダーへの登録だけが失敗しても（例: 読み取り専用の購読カレンダーを
+    誤って登録先に選んでいた場合）、成功した分は失わずに返す。全滅した場合のみ
+    例外を送出する。以前は1つでも失敗すると成功分ごと失われ、実際にはカレンダー上に
+    作成された予定が宙に浮いて残ってしまっていた。
+    """
     adapters = await get_write_adapters(user_id, calendar)
     if not adapters:
         raise ValueError(f"{calendar} が連携されていません")
@@ -200,10 +225,15 @@ async def create_event(
     judged = judge_memo_importance(memo) if memo else {"priority": "normal", "flagged": False}
     sb = get_supabase()
     results = []
+    errors: list[str] = []
     for adapter in adapters:
-        ev = await adapter.create_event(
-            title=title, start=_parse_dt(start), end=_parse_dt(end), location=location
-        )
+        try:
+            ev = await adapter.create_event(
+                title=title, start=_parse_dt(start), end=_parse_dt(end), location=location
+            )
+        except Exception as exc:  # noqa: BLE001
+            errors.append(str(exc))
+            continue
         sb.table("events").insert(
             {
                 "user_id": user_id,
@@ -219,6 +249,12 @@ async def create_event(
             }
         ).execute()
         results.append(ev)
+
+    if not results:
+        raise ValueError(
+            f"{calendar}への登録にすべて失敗しました。書き込み権限の無いカレンダー"
+            f"（購読カレンダー等）が登録先に選ばれている可能性があります: {'; '.join(errors)}"
+        )
     return results
 
 
@@ -230,22 +266,37 @@ async def hold_tentative_slots(
     登録先が複数選択されていれば、その全カレンダーに押さえる。
     確定・キャンセル時に release_tentative_slots() で消せるよう、
     削除に必要な calendar_id を含めて返す。
+
+    登録先カレンダーが複数ある場合、1つが失敗しても（例: 読み取り専用の
+    購読カレンダーを誤って登録先に選んでいた場合）他の成功分は失わない。
+    以前はasyncio.gatherが最初の例外で全体を打ち切る作りだったため、
+    実際には書き込みに成功していたカレンダーの分まで「失敗」として
+    報告してしまい、しかもその分は追跡されず宙に浮いて残っていた。
     """
     adapters = await get_write_adapters(user_id, calendar)
     if not adapters:
         raise ValueError(f"{calendar} が連携されていません")
 
-    async def hold_one(adapter, slot: dict) -> dict:
-        return await adapter.create_event(
-            title=f"[仮] {title}",
-            start=_parse_dt(slot["start"]),
-            end=_parse_dt(slot["end"]),
-        )
+    async def hold_one(adapter, slot: dict) -> dict | Exception:
+        try:
+            return await adapter.create_event(
+                title=f"[仮] {title}",
+                start=_parse_dt(slot["start"]),
+                end=_parse_dt(slot["end"]),
+            )
+        except Exception as exc:  # noqa: BLE001
+            return exc
 
     # 枠数×カレンダー数を直列で作ると体感が遅いため並列で登録する
-    return list(
-        await asyncio.gather(*[hold_one(a, s) for s in slots for a in adapters])
-    )
+    raw = await asyncio.gather(*[hold_one(a, s) for s in slots for a in adapters])
+    results = [r for r in raw if not isinstance(r, Exception)]
+    if not results:
+        errors = {str(r) for r in raw if isinstance(r, Exception)}
+        raise ValueError(
+            f"{calendar}への仮押さえにすべて失敗しました。書き込み権限の無いカレンダー"
+            f"（購読カレンダー等）が登録先に選ばれている可能性があります: {'; '.join(errors)}"
+        )
+    return results
 
 
 async def release_tentative_slots(user_id: str, *, items: list[dict]) -> int:
