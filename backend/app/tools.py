@@ -45,9 +45,19 @@ BROAD_MAX_SLOTS = 5
 BROAD_MIN_GAP_DAYS = 5  # ざっくり系では候補日をこの日数以上離し、月内で偏らないようにする
 NARROW_MAX_SLOTS = 3
 
+# datetime.weekday() は月曜=0〜日曜=6。Claudeには数値ではなく短縮英字で
+# 指定させ、0始まりの取り違えを防ぐ。
+WEEKDAY_CODES = {"mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5, "sun": 6}
 
-async def get_free_slots(user_id: str, date_from: str, date_to: str) -> dict:
-    """§6-3設計思想: Google + Outlook を必ず並列で呼び出し、空いている1時間枠を提案する。
+
+async def get_free_slots(
+    user_id: str,
+    date_from: str,
+    date_to: str,
+    duration_minutes: int = 60,
+    weekdays: list[str] | None = None,
+) -> dict:
+    """§6-3設計思想: Google + Outlook を必ず並列で呼び出し、空いている枠を提案する。
     「来週空いてる？」のような狭い範囲では最大3件、「今月どこか空いてる？」のような
     広い範囲（BROAD_RANGE_DAYS超）では最大5件を、日付が偏らないよう間隔を空けて返す。
     件数の上限に達した時点で探索を打ち切るため、結果には実際に調べ終えた範囲
@@ -55,6 +65,11 @@ async def get_free_slots(user_id: str, date_from: str, date_to: str) -> dict:
     「埋まっている」と誤認しないための情報で、ユーザーから「他にはある？」と
     追加で聞かれた場合は、この searched_until を新しい date_from として
     続きから検索すること（date_from をやり直さない）。
+
+    duration_minutesで必要な長さ（既定60分）を、weekdaysで曜日を絞れる。
+    「水曜日だけ」のような曜日指定は検索範囲を連続スキャンしてから後で
+    ふるい落とすと非効率（週1回しか該当日が無いため、何度もget_free_slotsを
+    呼び直す羽目になる）なので、探索の時点で対象外の曜日を丸ごと飛ばす。
 
     終日予定（在宅、リフォーム工事など）は検索の主対象にはせず、個別の時刻指定予定とだけ
     衝突判定する。個別予定と被らなければ候補にはなるが、終日予定と重なる分は優先度を下げ、
@@ -71,6 +86,8 @@ async def get_free_slots(user_id: str, date_from: str, date_to: str) -> dict:
     is_broad = (time_max - time_min) > timedelta(days=BROAD_RANGE_DAYS)
     max_slots = BROAD_MAX_SLOTS if is_broad else NARROW_MAX_SLOTS
     min_gap = timedelta(days=BROAD_MIN_GAP_DAYS) if is_broad else timedelta(0)
+    duration = timedelta(minutes=duration_minutes)
+    allowed_weekdays = {WEEKDAY_CODES[w] for w in weekdays if w in WEEKDAY_CODES} if weekdays else None
 
     results = await asyncio.gather(*[a.list_events(time_min, time_max) for a in adapters.values()])
 
@@ -100,6 +117,14 @@ async def get_free_slots(user_id: str, date_from: str, date_to: str) -> dict:
     last_picked: datetime | None = None  # 直近で候補にした日時（偏り防止の間隔チェック用）
 
     while cursor < time_max and len(slots) < max_slots:
+        if allowed_weekdays is not None and cursor.weekday() not in allowed_weekdays:
+            # 対象外の曜日は1日単位で丸ごと飛ばす（該当日を連続スキャンで
+            # たまたま拾うのを待つと、週1回しか無い曜日では非効率なため）
+            cursor = (cursor + timedelta(days=1)).replace(
+                hour=day_start_h, minute=day_start_m, second=0, microsecond=0
+            )
+            continue
+
         day_end = cursor.replace(hour=day_end_h, minute=day_end_m, second=0, microsecond=0)
         if cursor >= day_end:
             cursor = (cursor + timedelta(days=1)).replace(
@@ -114,7 +139,13 @@ async def get_free_slots(user_id: str, date_from: str, date_to: str) -> dict:
             )
             continue
 
-        slot_end = cursor + timedelta(hours=1)
+        slot_end = cursor + duration
+        if slot_end > day_end:
+            # 指定の長さがこの日の残り時間に収まらないので翌日へ
+            cursor = (cursor + timedelta(days=1)).replace(
+                hour=day_start_h, minute=day_start_m, second=0, microsecond=0
+            )
+            continue
         if _overlaps(hard_ranges, cursor, slot_end):
             cursor += timedelta(minutes=30)
             continue
@@ -513,12 +544,24 @@ TOOLS = [
             f"{BROAD_RANGE_DAYS}日を超える広い期間（「今月中」「来月あたり」等）を指定した場合は"
             f"最大{BROAD_MAX_SLOTS}枠を日付が偏らないよう間隔を空けて返し、それ以下の狭い期間では"
             f"最大{NARROW_MAX_SLOTS}枠を返す。"
+            "「水曜日だけ」のように曜日を絞りたい場合はweekdaysを指定すること"
+            "（date_from/date_toの範囲を連続で検索してから後で候補を選り分けるのは、"
+            "該当日が少ない場合に非効率で何度も呼び直す原因になるため避けること）。"
         ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "date_from": {"type": "string", "description": "検索開始日時 ISO8601（例: 2026-10-01T18:00:00+09:00、必ずタイムゾーンオフセットを含めること）"},
                 "date_to": {"type": "string", "description": "検索終了日時 ISO8601（必ずタイムゾーンオフセットを含めること）"},
+                "duration_minutes": {
+                    "type": "integer",
+                    "description": "必要な予定の長さ（分）。省略時は60分。「2時間ほど」なら120を指定すること",
+                },
+                "weekdays": {
+                    "type": "array",
+                    "items": {"type": "string", "enum": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]},
+                    "description": "特定の曜日だけに絞りたい場合に指定する（例:「水曜日だけ」ならwedのみ指定）。指定が無ければ全曜日が対象",
+                },
             },
             "required": ["date_from", "date_to"],
         },
@@ -671,7 +714,7 @@ TOOLS = [
 
 async def run_tool(name: str, user_id: str, tool_input: dict) -> dict:
     if name == "get_free_slots":
-        return await get_free_slots(user_id, tool_input["date_from"], tool_input["date_to"])
+        return await get_free_slots(user_id, **tool_input)
     if name == "create_event":
         return await create_event(user_id, **tool_input)
     if name == "find_events":
