@@ -31,14 +31,22 @@ async def refresh_microsoft_token(refresh_token: str) -> tuple[str, int]:
 
 
 async def list_outlook_calendars(access_token: str) -> list[dict]:
-    """ユーザーが持つ全カレンダー一覧（既定以外の追加・共有カレンダーを含む）を返す。"""
+    """ユーザーが持つ全カレンダー一覧（既定以外の追加・共有カレンダーを含む）を返す。
+    canEditがFalseのカレンダー（他者から読み取り専用で共有されたもの等）は
+    APIから書き込みできないため、writable=Falseとして返す。
+    """
     async with httpx.AsyncClient(
         base_url=API_BASE, headers={"Authorization": f"Bearer {access_token}"}
     ) as client:
         resp = await client.get("/me/calendars")
         resp.raise_for_status()
         return [
-            {"id": c["id"], "name": c.get("name", c["id"]), "primary": c.get("isDefaultCalendar", False)}
+            {
+                "id": c["id"],
+                "name": c.get("name", c["id"]),
+                "primary": c.get("isDefaultCalendar", False),
+                "writable": c.get("canEdit", True),
+            }
             for c in resp.json().get("value", [])
         ]
 

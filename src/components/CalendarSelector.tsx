@@ -85,19 +85,30 @@ export function CalendarSelector({
                 <span className="text-navy-500">参照</span>
               </label>
               <span className="text-navy-800 flex-1 truncate">{c.name}</span>
-              <button
-                type="button"
-                disabled={writeDisabled}
-                onClick={() => toggleWrite(c.id)}
-                className={clsx(
-                  'shrink-0 text-[11px] font-semibold rounded-full px-2.5 py-1 transition disabled:opacity-40',
-                  isWrite
-                    ? 'bg-gold-500 text-navy-900'
-                    : 'bg-navy-100 text-navy-500 hover:bg-navy-200',
-                )}
-              >
-                {isWrite ? '登録先 ✓' : '登録先にする'}
-              </button>
+              {c.writable ? (
+                <button
+                  type="button"
+                  disabled={writeDisabled}
+                  onClick={() => toggleWrite(c.id)}
+                  className={clsx(
+                    'shrink-0 text-[11px] font-semibold rounded-full px-2.5 py-1 transition disabled:opacity-40',
+                    isWrite
+                      ? 'bg-gold-500 text-navy-900'
+                      : 'bg-navy-100 text-navy-500 hover:bg-navy-200',
+                  )}
+                >
+                  {isWrite ? '登録先 ✓' : '登録先にする'}
+                </button>
+              ) : (
+                // URL購読で取り込んだ他社カレンダー等はAPIから書き込めないため、
+                // 登録先には選べない（選ばせると必ず失敗するので、そもそも出さない）
+                <span
+                  className="shrink-0 text-[11px] text-navy-400 rounded-full px-2.5 py-1 bg-navy-50 border border-navy-100"
+                  title="読み取り専用のカレンダーのため、登録先には設定できません"
+                >
+                  読み取り専用（登録先にできません）
+                </span>
+              )}
             </div>
           )
         })}

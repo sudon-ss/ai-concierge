@@ -28,7 +28,11 @@ async def refresh_google_token(refresh_token: str) -> tuple[str, int]:
 
 
 async def list_google_calendars(access_token: str) -> list[dict]:
-    """ユーザーが持つ全カレンダー一覧（primary以外の追加・共有カレンダーを含む）を返す。"""
+    """ユーザーが持つ全カレンダー一覧（primary以外の追加・共有カレンダーを含む）を返す。
+    accessRoleがreader/freeBusyReaderのカレンダー（URL購読で取り込んだ他社カレンダー等）は
+    APIから書き込みできないため、writable=Falseとして呼び出し側（登録先の選択UI）が
+    そもそも登録先に選ばせないようにできるようにする。
+    """
     async with httpx.AsyncClient(
         base_url=API_BASE, headers={"Authorization": f"Bearer {access_token}"}
     ) as client:
@@ -39,6 +43,7 @@ async def list_google_calendars(access_token: str) -> list[dict]:
                 "id": c["id"],
                 "name": c.get("summaryOverride") or c.get("summary", c["id"]),
                 "primary": c.get("primary", False),
+                "writable": c.get("accessRole") in ("owner", "writer"),
             }
             for c in resp.json().get("items", [])
         ]
