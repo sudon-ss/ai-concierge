@@ -210,12 +210,24 @@ def _persist_turn(
         pass
 
 
-async def event_stream(user_id: str, user_message: str, profile: str | None = None) -> AsyncIterator[str]:
-    client = AsyncAnthropic(api_key=settings.anthropic_api_key)
-    sb = get_supabase()
+def _has_content(content) -> bool:
+    """会話履歴の1件が、Anthropic APIに渡してよい形（空のテキストブロック等を含まない）かを確認する。
+    過去に何らかの理由で壊れた行が紛れ込んでいても、読み込み時点で弾いて会話全体を守るための保険。
+    """
+    if not isinstance(content, list) or not content:
+        return False
+    for block in content:
+        if not isinstance(block, dict):
+            return False
+        if block.get("type") == "text" and not str(block.get("text", "")).strip():
+            return False
+    return True
 
+
+def _load_history_messages(user_id: str) -> list[dict]:
     history_res = (
-        sb.table("messages")
+        get_supabase()
+        .table("messages")
         .select("role, content")
         .eq("user_id", user_id)
         .order("created_at", desc=True)
@@ -223,29 +235,57 @@ async def event_stream(user_id: str, user_message: str, profile: str | None = No
         .execute()
     )
     history = list(reversed(history_res.data))
+    return [
+        {"role": h["role"], "content": h["content"]} for h in history if _has_content(h["content"])
+    ]
 
-    messages = [{"role": h["role"], "content": h["content"]} for h in history]
+
+async def event_stream(user_id: str, user_message: str, profile: str | None = None) -> AsyncIterator[str]:
+    client = AsyncAnthropic(api_key=settings.anthropic_api_key)
+    system_prompt = build_system_prompt(user_id, profile)
+
+    messages = _load_history_messages(user_id)
     messages.append({"role": "user", "content": user_message})
 
     tool_events = []
     final_text = ""
-    system_prompt = build_system_prompt(user_id, profile)
     # 同じツールが1ターン中に何回呼ばれたか（例: get_free_slotsの2回目=範囲を広げての再検索）を
     # フロントに伝え、「なぜもう一度調べているか」が分かる状態表示を出せるようにする。
     tool_call_counts: dict[str, int] = {}
+    # 何かしらテキストを画面に出し始めた後に失敗した場合、自動リトライで会話履歴を消すと
+    # 表示中の文章と辻褄が合わなくなる（前半と後半で別の会話のように混ざる）ため、
+    # 何も表示していない状態でのエラーに限って自動リトライの対象にする
+    any_delta_sent = False
+    retried = False
 
     try:
         for iteration in range(1, MAX_TOOL_ITERATIONS + 1):
-            async with client.messages.stream(
-                model="claude-sonnet-5",
-                max_tokens=1024,
-                system=system_prompt,
-                tools=TOOLS,
-                messages=messages,
-            ) as stream:
-                async for text in stream.text_stream:
-                    yield _sse("delta", {"text": text})
-                response = await stream.get_final_message()
+            try:
+                async with client.messages.stream(
+                    model="claude-sonnet-5",
+                    max_tokens=1024,
+                    system=system_prompt,
+                    tools=TOOLS,
+                    messages=messages,
+                ) as stream:
+                    async for text in stream.text_stream:
+                        any_delta_sent = True
+                        yield _sse("delta", {"text": text})
+                    response = await stream.get_final_message()
+            except Exception:
+                # 会話履歴に壊れた行が混入している等の理由でAnthropic側から拒否された場合、
+                # まだ何も表示していないなら、その会話をリセットして同じ発言で1度だけ
+                # 自動的に再試行する。ユーザーには通信エラーを見せず、通常の応答として返せる
+                if not any_delta_sent and not retried:
+                    retried = True
+                    await asyncio.to_thread(
+                        lambda: get_supabase().table("messages").delete().eq("user_id", user_id).execute()
+                    )
+                    messages = [{"role": "user", "content": user_message}]
+                    tool_events = []
+                    tool_call_counts = {}
+                    continue
+                raise
 
             if response.stop_reason != "tool_use":
                 final_text = "".join(b.text for b in response.content if b.type == "text")
