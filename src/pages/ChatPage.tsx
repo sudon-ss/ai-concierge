@@ -23,6 +23,7 @@ import {
   type ApiTask,
   type ChatApiResponse,
   type TentativeRef,
+  type ToolStartInfo,
 } from '../lib/api'
 
 const uid = () => Math.random().toString(36).slice(2, 9)
@@ -31,9 +32,29 @@ const TOOL_STATUS_LABELS: Record<string, string> = {
   get_free_slots: '🔍 空き時間を確認しています…',
   create_event: '📅 カレンダーに登録しています…',
   reschedule_event: '🔄 ご予定を変更しています…',
+  update_event_details: '✏️ ご予定の内容を変更しています…',
+  confirm_tentative_slot: '✅ ご予定を確定し、他の候補を整理しています…',
   stage_event_deletion: '🗑️ 対象のご予定を確認しています…',
   create_task: '📝 タスクを登録しています…',
   judge_memo_importance: '📝 メモを確認しています…',
+}
+
+// 同じツールが1ターン中に2回以上呼ばれた場合（大半は「3件に満たなかったので範囲を
+// 広げて再検索」）向けの、理由が伝わる文言。無ければ通常ラベルをそのまま使う。
+const TOOL_RETRY_LABELS: Record<string, string> = {
+  get_free_slots: '🔍 候補が十分に見つからなかったため、範囲を広げて再検索しています…',
+}
+
+function buildToolStatusLabel(info: ToolStartInfo): string {
+  const base =
+    info.callIndex > 1
+      ? (TOOL_RETRY_LABELS[info.name] ?? TOOL_STATUS_LABELS[info.name] ?? '処理しています…')
+      : (TOOL_STATUS_LABELS[info.name] ?? '処理しています…')
+  // 残り試行回数が少なくなってきたら、もう少しで結果が出る（か、諦める）ことだけ伝える。
+  // 内部の回数そのものは見せず、体感として「あと少し」だと分かる程度に留める。
+  const remaining = info.maxIterations - info.iteration
+  if (remaining <= 1) return `${base}\n（もう少しで完了いたします）`
+  return base
 }
 
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -387,8 +408,8 @@ export function ChatPage() {
             }),
           )
         },
-        (toolName) => {
-          const label = TOOL_STATUS_LABELS[toolName] ?? '処理しています…'
+        (info) => {
+          const label = buildToolStatusLabel(info)
           statusSuffix = `\n\n${label}`
           const suffix = statusSuffix
           setMessages((prev) =>

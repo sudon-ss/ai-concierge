@@ -32,7 +32,11 @@ async def refresh_google_token(refresh_token: str) -> tuple[str, int]:
 
 
 async def list_google_calendars(access_token: str) -> list[dict]:
-    """ユーザーが持つ全カレンダー一覧（primary以外の追加・共有カレンダーを含む）を返す。"""
+    """ユーザーが持つ全カレンダー一覧（primary以外の追加・共有カレンダーを含む）を返す。
+    accessRoleがreader/freeBusyReaderのカレンダー（URL購読で取り込んだ他社カレンダー等）は
+    APIから書き込みできないため、writable=Falseとして呼び出し側（登録先の選択UI）が
+    そもそも登録先に選ばせないようにできるようにする。
+    """
     async with httpx.AsyncClient(
         base_url=API_BASE, headers={"Authorization": f"Bearer {access_token}"}, timeout=HTTP_TIMEOUT
     ) as client:
@@ -43,12 +47,15 @@ async def list_google_calendars(access_token: str) -> list[dict]:
                 "id": c["id"],
                 "name": c.get("summaryOverride") or c.get("summary", c["id"]),
                 "primary": c.get("primary", False),
+                "writable": c.get("accessRole") in ("owner", "writer"),
             }
             for c in resp.json().get("items", [])
         ]
 
 
 def _to_common(ev: dict, calendar_id: str | None = None) -> dict:
+    # 終日予定は dateTime が無く date（時刻・タイムゾーン無しの日付文字列）だけが入る
+    all_day = "date" in ev.get("start", {})
     start = ev.get("start", {}).get("dateTime") or ev.get("start", {}).get("date")
     end = ev.get("end", {}).get("dateTime") or ev.get("end", {}).get("date")
     return {
@@ -58,6 +65,7 @@ def _to_common(ev: dict, calendar_id: str | None = None) -> dict:
         "end": end,
         "location": ev.get("location"),
         "source": "google",
+        "all_day": all_day,
         # 削除時にどのカレンダーへ問い合わせるか判別するために保持する
         "calendar_id": calendar_id,
     }

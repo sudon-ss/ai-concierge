@@ -7,7 +7,10 @@ class CalendarAdapter(ABC):
 
     @abstractmethod
     async def list_events(self, time_min: datetime, time_max: datetime) -> list[dict]:
-        """[{id, title, start, end, location}] のリストを返す（両アダプター共通フォーマット）。"""
+        """[{id, title, start, end, location, all_day}] のリストを返す（両アダプター共通フォーマット）。
+        all_day=True の予定は start/end に時刻・タイムゾーン情報を含まない日付のみの
+        文字列になりうるため、呼び出し側で比較する際は必ずタイムゾーンを補うこと。
+        """
 
     @abstractmethod
     async def create_event(

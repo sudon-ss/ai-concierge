@@ -52,12 +52,27 @@ class SelectCalendarsRequest(BaseModel):
 
 
 @router.put("/{provider}/selection")
-def select_calendars(
+async def select_calendars(
     provider: CalendarSource, body: SelectCalendarsRequest, user: SessionUser = Depends(get_current_user)
 ):
     token_row = get_oauth_tokens(user_id=user.user_id, provider=provider)
     if not token_row:
         raise HTTPException(status_code=400, detail=f"{provider} が連携されていません")
+
+    if body.write_calendar_ids:
+        # 読み取り専用カレンダー（URL購読で取り込んだ他社カレンダー等）は、フロントの
+        # 画面上は登録先に選べないようにしているが、直接APIを叩かれた場合の保険として
+        # サーバー側でも二重にチェックする。書き込むと必ず失敗するのが分かっているものを
+        # 事前に弾くことで、実際に登録処理が失敗するまで気づけない事態を避ける。
+        calendars = await fetch_calendars(user.user_id, provider) or []
+        non_writable = {c["id"] for c in calendars if not c.get("writable", True)}
+        blocked = [cid for cid in body.write_calendar_ids if cid in non_writable]
+        if blocked:
+            raise HTTPException(
+                status_code=400,
+                detail="読み取り専用のカレンダーは登録先に設定できません（購読カレンダー等の可能性があります）",
+            )
+
     set_calendar_selection(
         user_id=user.user_id,
         provider=provider,
