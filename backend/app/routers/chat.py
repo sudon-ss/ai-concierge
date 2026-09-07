@@ -189,6 +189,12 @@ async def event_stream(user_id: str, user_message: str, profile: str | None = No
 
             if response.stop_reason != "tool_use":
                 final_text = "".join(b.text for b in response.content if b.type == "text")
+                # Claudeがテキストを一切含まない応答を返すことがある。空文字のまま保存すると
+                # 「テキストブロックが空のメッセージは受け付けない」というAnthropic側の制約に
+                # 触れ、次回以降の全リクエストが履歴読み込み時点で400になり続けてしまうため、
+                # 必ず非空の文字列にしておく
+                if not final_text.strip():
+                    final_text = "恐れ入ります、うまくお答えできませんでした。もう一度お試しくださいませ。"
                 break
 
             messages.append({"role": "assistant", "content": response.content})
@@ -207,9 +213,18 @@ async def event_stream(user_id: str, user_message: str, profile: str | None = No
         else:
             final_text = "申し訳ございません、処理に時間がかかっております。もう一度お試しください。"
     except Exception as exc:  # noqa: BLE001
-        # 失敗した回こそ後から原因を追いたいので、エラーとそこまでのツール実行を残す
+        # 失敗した回こそ後から原因を追いたいので、エラーとそこまでのツール実行を残す。
+        # ただし空文字（content: [{"type":"text","text":""}]）で保存すると、Anthropic側が
+        # 「テキストブロックが空のメッセージ」を含む会話履歴を拒否するようになり、次回以降の
+        # リクエストが毎回400 Bad Requestで即失敗し続ける自己増殖的な不具合になる。
+        # 必ず非空の文字列を保存すること
         await asyncio.to_thread(
-            _persist_turn, user_id, user_message, "", tool_events, str(exc)
+            _persist_turn,
+            user_id,
+            user_message,
+            "（エラーのため応答できませんでした）",
+            tool_events,
+            str(exc),
         )
         yield _sse("error", {"message": str(exc)})
         return

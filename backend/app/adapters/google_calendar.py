@@ -10,9 +10,13 @@ from .base import CalendarAdapter
 API_BASE = "https://www.googleapis.com/calendar/v3"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 
+# httpxの既定タイムアウトは5秒だが、予定数の多いカレンダーではGoogle側の応答に
+# それ以上かかることがあり、「通信エラー」として表面化していた。余裕を持たせる
+HTTP_TIMEOUT = httpx.Timeout(30.0)
+
 
 async def refresh_google_token(refresh_token: str) -> tuple[str, int]:
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
         resp = await client.post(
             TOKEN_URL,
             data={
@@ -30,7 +34,7 @@ async def refresh_google_token(refresh_token: str) -> tuple[str, int]:
 async def list_google_calendars(access_token: str) -> list[dict]:
     """ユーザーが持つ全カレンダー一覧（primary以外の追加・共有カレンダーを含む）を返す。"""
     async with httpx.AsyncClient(
-        base_url=API_BASE, headers={"Authorization": f"Bearer {access_token}"}
+        base_url=API_BASE, headers={"Authorization": f"Bearer {access_token}"}, timeout=HTTP_TIMEOUT
     ) as client:
         resp = await client.get("/users/me/calendarList")
         resp.raise_for_status()
@@ -67,7 +71,7 @@ class GoogleCalendarAdapter(CalendarAdapter):
         write_calendar_id: str | None = None,
     ):
         self._client = httpx.AsyncClient(
-            base_url=API_BASE, headers={"Authorization": f"Bearer {access_token}"}
+            base_url=API_BASE, headers={"Authorization": f"Bearer {access_token}"}, timeout=HTTP_TIMEOUT
         )
         # 未選択時はprimary（既定カレンダー）にフォールバック（§10-4後続: 複数カレンダー対応、最大3件）
         self._read_ids = read_calendar_ids or ["primary"]
@@ -84,9 +88,22 @@ class GoogleCalendarAdapter(CalendarAdapter):
         }
 
         async def fetch_one(path: str, calendar_id: str) -> list[dict]:
-            resp = await self._client.get(f"/calendars/{path}/events", params=params)
-            resp.raise_for_status()
-            return [_to_common(ev, calendar_id) for ev in resp.json().get("items", [])]
+            # 1回のリクエストでは既定250件までしか返らず、予定数の多いカレンダーだと
+            # 一部が黙って欠落する（nextPageTokenを無視していた）。全ページ取得する
+            events: list[dict] = []
+            page_token: str | None = None
+            while True:
+                page_params = {**params, "maxResults": 2500}
+                if page_token:
+                    page_params["pageToken"] = page_token
+                resp = await self._client.get(f"/calendars/{path}/events", params=page_params)
+                resp.raise_for_status()
+                body = resp.json()
+                events.extend(_to_common(ev, calendar_id) for ev in body.get("items", []))
+                page_token = body.get("nextPageToken")
+                if not page_token:
+                    break
+            return events
 
         # 複数カレンダー選択時も選択数に比例して遅くならないよう並列取得する
         results = await asyncio.gather(

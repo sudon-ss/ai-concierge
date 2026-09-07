@@ -8,13 +8,17 @@ from .base import CalendarAdapter
 
 API_BASE = "https://graph.microsoft.com/v1.0"
 
+# httpxの既定タイムアウトは5秒だが、予定数の多いカレンダーではGraph側の応答に
+# それ以上かかることがあり、「通信エラー」として表面化していた。余裕を持たせる
+HTTP_TIMEOUT = httpx.Timeout(30.0)
+
 
 def _token_url() -> str:
     return f"https://login.microsoftonline.com/{settings.microsoft_tenant}/oauth2/v2.0/token"
 
 
 async def refresh_microsoft_token(refresh_token: str) -> tuple[str, int]:
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
         resp = await client.post(
             _token_url(),
             data={
@@ -33,7 +37,7 @@ async def refresh_microsoft_token(refresh_token: str) -> tuple[str, int]:
 async def list_outlook_calendars(access_token: str) -> list[dict]:
     """ユーザーが持つ全カレンダー一覧（既定以外の追加・共有カレンダーを含む）を返す。"""
     async with httpx.AsyncClient(
-        base_url=API_BASE, headers={"Authorization": f"Bearer {access_token}"}
+        base_url=API_BASE, headers={"Authorization": f"Bearer {access_token}"}, timeout=HTTP_TIMEOUT
     ) as client:
         resp = await client.get("/me/calendars")
         resp.raise_for_status()
@@ -69,6 +73,7 @@ class OutlookCalendarAdapter(CalendarAdapter):
                 "Authorization": f"Bearer {access_token}",
                 "Prefer": 'outlook.timezone="Asia/Tokyo"',
             },
+            timeout=HTTP_TIMEOUT,
         )
         # 未選択時は既定カレンダー（/me/...）にフォールバック（§10-4後続: 複数カレンダー対応、最大3件）
         self._read_ids: list[str | None] = list(read_calendar_ids or []) or [None]
@@ -81,12 +86,25 @@ class OutlookCalendarAdapter(CalendarAdapter):
             "startDateTime": time_min.isoformat(),
             "endDateTime": time_max.isoformat(),
             "$orderby": "start/dateTime",
+            "$top": 250,
         }
 
         async def fetch_one(path: str, calendar_id: str | None) -> list[dict]:
+            # Graphは既定で1ページあたりの件数が少なく、予定数の多いカレンダーだと
+            # @odata.nextLinkを無視すると一部が黙って欠落する。全ページ取得する
+            events: list[dict] = []
             resp = await self._client.get(f"{path}/calendarView", params=params)
             resp.raise_for_status()
-            return [_to_common(ev, calendar_id) for ev in resp.json().get("value", [])]
+            body = resp.json()
+            events.extend(_to_common(ev, calendar_id) for ev in body.get("value", []))
+            next_link = body.get("@odata.nextLink")
+            while next_link:
+                resp = await self._client.get(next_link)
+                resp.raise_for_status()
+                body = resp.json()
+                events.extend(_to_common(ev, calendar_id) for ev in body.get("value", []))
+                next_link = body.get("@odata.nextLink")
+            return events
 
         # 複数カレンダー選択時も選択数に比例して遅くならないよう並列取得する
         results = await asyncio.gather(

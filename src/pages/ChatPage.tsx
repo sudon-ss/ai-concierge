@@ -402,7 +402,9 @@ export function ChatPage() {
         profileId,
       )
         .then((res) => updatePlaceholder(buildBackendReplyContent(res, text)))
-        .catch(() => {
+        .catch((err) => {
+          // 原因究明のため、画面に出す文言はそのままにconsoleへ実際のエラーを残す
+          console.error('chat request failed:', err)
           updatePlaceholder({
             type: 'text',
             text: '恐れ入ります、通信エラーが発生いたしました。もう一度お試しくださいませ。',
