@@ -2,6 +2,8 @@ import asyncio
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
+import jpholiday
+
 from .calendar_service import (
     dedupe_events,
     get_adapter,
@@ -56,6 +58,7 @@ async def get_free_slots(
     date_to: str,
     duration_minutes: int = 60,
     weekdays: list[str] | None = None,
+    exclude_holidays: bool = False,
 ) -> dict:
     """§6-3設計思想: Google + Outlook を必ず並列で呼び出し、空いている枠を提案する。
     「来週空いてる？」のような狭い範囲では最大3件、「今月どこか空いてる？」のような
@@ -132,6 +135,13 @@ async def get_free_slots(
         if allowed_weekdays is not None and cursor.weekday() not in allowed_weekdays:
             # 対象外の曜日は1日単位で丸ごと飛ばす（該当日を連続スキャンで
             # たまたま拾うのを待つと、週1回しか無い曜日では非効率なため）
+            cursor = (cursor + timedelta(days=1)).replace(
+                hour=day_start_h, minute=day_start_m, second=0, microsecond=0
+            )
+            continue
+
+        if exclude_holidays and jpholiday.is_holiday(cursor.date()):
+            # 「祝日を除く」指定時は日本の祝日を1日単位で飛ばす
             cursor = (cursor + timedelta(days=1)).replace(
                 hour=day_start_h, minute=day_start_m, second=0, microsecond=0
             )
@@ -598,6 +608,8 @@ TOOLS = [
             "「水曜日だけ」のように曜日を絞りたい場合はweekdaysを指定すること"
             "（date_from/date_toの範囲を連続で検索してから後で候補を選り分けるのは、"
             "該当日が少ない場合に非効率で何度も呼び直す原因になるため避けること）。"
+            "「祝日を除く」と言われた場合はexclude_holidaysをtrueにすること"
+            "（日本の祝日はこのツール側で判定して除外するので、Claudeが祝日を覚えている必要はない）。"
         ),
         "input_schema": {
             "type": "object",
@@ -612,6 +624,10 @@ TOOLS = [
                     "type": "array",
                     "items": {"type": "string", "enum": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]},
                     "description": "特定の曜日だけに絞りたい場合に指定する（例:「水曜日だけ」ならwedのみ指定）。指定が無ければ全曜日が対象",
+                },
+                "exclude_holidays": {
+                    "type": "boolean",
+                    "description": "「祝日を除く」と指定された場合にtrueにする。日本の祝日にあたる日を検索から除外する",
                 },
             },
             "required": ["date_from", "date_to"],
