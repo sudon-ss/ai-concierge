@@ -263,7 +263,9 @@ async def event_stream(user_id: str, user_message: str, profile: str | None = No
             try:
                 async with client.messages.stream(
                     model="claude-sonnet-5",
-                    max_tokens=1024,
+                    # 1024だと、候補提示→確定→場所変更→確認、のような複数ステップの依頼で
+                    # ツール呼び出しの途中で上限に達し、応答が空になってしまうことがあった
+                    max_tokens=4096,
                     system=system_prompt,
                     tools=TOOLS,
                     messages=messages,
@@ -286,6 +288,23 @@ async def event_stream(user_id: str, user_message: str, profile: str | None = No
                     tool_call_counts = {}
                     continue
                 raise
+
+            if response.stop_reason == "max_tokens":
+                # 出力が長くなりすぎて上限に達した。途中まで文章が出ていればそれを活かし、
+                # ツール呼び出しの途中で切れて何も出ていない場合は、分けて依頼するよう促す
+                partial = "".join(b.text for b in response.content if b.type == "text").strip()
+                if partial:
+                    final_text = (
+                        partial
+                        + "\n\n（恐れ入ります、ここで文字数の上限に達しました。"
+                        "続きが必要な場合はもう一度お申し付けくださいませ）"
+                    )
+                else:
+                    final_text = (
+                        "恐れ入ります、一度にお応えするには内容が多かったようです。"
+                        "お手数ですが、条件を分けてお申し付けくださいませ。"
+                    )
+                break
 
             if response.stop_reason != "tool_use":
                 final_text = "".join(b.text for b in response.content if b.type == "text")
