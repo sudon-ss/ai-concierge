@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 from datetime import datetime, timedelta
 from typing import AsyncIterator
 from zoneinfo import ZoneInfo
@@ -16,6 +17,8 @@ from ..models import ChatRequest, SessionUser
 from ..tools import TOOLS, run_tool
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
+
+logger = logging.getLogger("concierge.chat")
 
 JST = ZoneInfo("Asia/Tokyo")
 
@@ -249,6 +252,10 @@ async def event_stream(user_id: str, user_message: str, profile: str | None = No
 
     tool_events = []
     final_text = ""
+    # ちゃんと応答できた時だけ会話履歴に残す。エラーや「うまく答えられなかった」で
+    # 終わった往復は履歴に保存しない（失敗したやり取りを毎回引きずらず、ユーザーが
+    # 手動で「会話をリセット」しなくても次から普通に使えるようにするため）
+    succeeded = True
     # 同じツールが1ターン中に何回呼ばれたか（例: get_free_slotsの2回目=範囲を広げての再検索）を
     # フロントに伝え、「なぜもう一度調べているか」が分かる状態表示を出せるようにする。
     tool_call_counts: dict[str, int] = {}
@@ -290,8 +297,8 @@ async def event_stream(user_id: str, user_message: str, profile: str | None = No
                 raise
 
             if response.stop_reason == "max_tokens":
-                # 出力が長くなりすぎて上限に達した。途中まで文章が出ていればそれを活かし、
-                # ツール呼び出しの途中で切れて何も出ていない場合は、分けて依頼するよう促す
+                # 出力が長くなりすぎて上限に達した。途中まで文章が出ていればそれを活かし（この場合は
+                # 一応の応答なので履歴に残す）、何も出ていない場合は失敗扱いで履歴に残さない
                 partial = "".join(b.text for b in response.content if b.type == "text").strip()
                 if partial:
                     final_text = (
@@ -300,6 +307,8 @@ async def event_stream(user_id: str, user_message: str, profile: str | None = No
                         "続きが必要な場合はもう一度お申し付けくださいませ）"
                     )
                 else:
+                    succeeded = False
+                    logger.warning("chat: max_tokensに達し応答が空 (user_id=%s)", user_id)
                     final_text = (
                         "恐れ入ります、一度にお応えするには内容が多かったようです。"
                         "お手数ですが、条件を分けてお申し付けくださいませ。"
@@ -307,12 +316,14 @@ async def event_stream(user_id: str, user_message: str, profile: str | None = No
                 break
 
             if response.stop_reason != "tool_use":
-                final_text = "".join(b.text for b in response.content if b.type == "text")
-                # Claudeがテキストを一切含まない応答を返すことがある。空文字のまま保存すると
-                # 「テキストブロックが空のメッセージは受け付けない」というAnthropic側の制約に
-                # 触れ、次回以降の全リクエストが履歴読み込み時点で400になり続けてしまうため、
-                # 必ず非空の文字列にしておく
-                if not final_text.strip():
+                final_text = "".join(b.text for b in response.content if b.type == "text").strip()
+                if not final_text:
+                    succeeded = False
+                    logger.warning(
+                        "chat: 応答テキストが空 (stop_reason=%s, user_id=%s)",
+                        response.stop_reason,
+                        user_id,
+                    )
                     final_text = "恐れ入ります、うまくお答えできませんでした。もう一度お試しくださいませ。"
                 break
 
@@ -339,28 +350,22 @@ async def event_stream(user_id: str, user_message: str, profile: str | None = No
                 tool_results.append({"type": "tool_result", "tool_use_id": block.id, "content": str(result)})
             messages.append({"role": "user", "content": tool_results})
         else:
+            succeeded = False
+            logger.warning("chat: ツール反復の上限に到達 (user_id=%s)", user_id)
             final_text = "申し訳ございません、処理に時間がかかっております。もう一度お試しください。"
     except Exception as exc:  # noqa: BLE001
-        # 失敗した回こそ後から原因を追いたいので、エラーとそこまでのツール実行を残す。
-        # ただし空文字（content: [{"type":"text","text":""}]）で保存すると、Anthropic側が
-        # 「テキストブロックが空のメッセージ」を含む会話履歴を拒否するようになり、次回以降の
-        # リクエストが毎回400 Bad Requestで即失敗し続ける自己増殖的な不具合になる。
-        # 必ず非空の文字列を保存すること
-        await asyncio.to_thread(
-            _persist_turn,
-            user_id,
-            user_message,
-            "（エラーのため応答できませんでした）",
-            tool_events,
-            str(exc),
-        )
+        # 失敗した往復は会話履歴に残さない（毎回引きずってしまうと、ユーザーが手動で
+        # 「会話をリセット」しない限り不自然な状態が続くため）。原因追跡はRenderのログとFrontの
+        # console.errorに任せる
+        logger.exception("chat: リクエスト失敗 (user_id=%s)", user_id)
         yield _sse("error", {"message": str(exc)})
         return
 
     # 保存を終えてから完了イベントを返す。フロントは done を受け取ると即座に接続を切るため、
     # yield の後ろに書くと保存が実行されないまま打ち切られる可能性がある。
     # 本文は既に delta で画面に出ており、ここでの待ちは体感にほぼ影響しない。
-    await asyncio.to_thread(_persist_turn, user_id, user_message, final_text, tool_events)
+    if succeeded:
+        await asyncio.to_thread(_persist_turn, user_id, user_message, final_text, tool_events)
 
     yield _sse("done", {"reply": final_text, "tool_events": tool_events})
 
