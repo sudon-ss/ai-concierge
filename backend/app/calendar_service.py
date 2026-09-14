@@ -3,10 +3,12 @@ import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+import httpx
+
 from .adapters.base import CalendarAdapter
 from .adapters.google_calendar import GoogleCalendarAdapter, list_google_calendars, refresh_google_token
 from .adapters.outlook_calendar import OutlookCalendarAdapter, list_outlook_calendars, refresh_microsoft_token
-from .auth import get_oauth_tokens, save_oauth_tokens
+from .auth import delete_oauth_tokens, get_oauth_tokens, save_oauth_tokens
 
 REFRESH_BUFFER_SECONDS = 120
 
@@ -37,10 +39,20 @@ async def _get_valid_token_row(user_id: str, provider: str) -> dict | None:
     if row["expires_at"] <= int(time.time()) + REFRESH_BUFFER_SECONDS:
         if not row.get("refresh_token"):
             return None
-        if provider == "google":
-            access_token, expires_in = await refresh_google_token(row["refresh_token"])
-        else:
-            access_token, expires_in = await refresh_microsoft_token(row["refresh_token"])
+        try:
+            if provider == "google":
+                access_token, expires_in = await refresh_google_token(row["refresh_token"])
+            else:
+                access_token, expires_in = await refresh_microsoft_token(row["refresh_token"])
+        except httpx.HTTPStatusError as e:
+            # invalid_grant等（ユーザーが外部でアクセス権を取り消した、開発中アプリの
+            # リフレッシュトークンが期限切れ等）はリトライしても直らないため、連携を
+            # 解除して「未連携」扱いに倒す。会話をリセットしても直らないのはこのケースで、
+            # 保存済みトークンがDBに残り続ける限り毎回同じ400エラーで落ちてしまうため。
+            if e.response.status_code == 400:
+                delete_oauth_tokens(user_id=user_id, provider=provider)
+                return None
+            raise
         save_oauth_tokens(
             user_id=user_id,
             provider=provider,
@@ -125,10 +137,15 @@ def dedupe_events(events: list[dict]) -> list[dict]:
 
 
 async def get_connected_adapters(user_id: str) -> dict[str, CalendarAdapter]:
-    """ユーザーが連携済みの全カレンダーアダプターを返す（トークンのリフレッシュも並列で行う）。"""
+    """ユーザーが連携済みの全カレンダーアダプターを返す（トークンのリフレッシュも並列で行う）。
+    片方のプロバイダで一時的なエラー（Google/Outlook側の障害等、invalid_grant以外）が
+    起きても、もう片方が使えるならそちらだけでも動作を続けられるようにする。
+    """
     providers = ("google", "outlook")
-    results = await asyncio.gather(*[get_adapter(user_id, p) for p in providers])
-    return {p: a for p, a in zip(providers, results) if a is not None}
+    results = await asyncio.gather(*[get_adapter(user_id, p) for p in providers], return_exceptions=True)
+    return {
+        p: a for p, a in zip(providers, results) if a is not None and not isinstance(a, BaseException)
+    }
 
 
 async def list_calendars(user_id: str, provider: str) -> list[dict] | None:

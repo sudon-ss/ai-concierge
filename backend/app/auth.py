@@ -109,3 +109,13 @@ def get_oauth_tokens(*, user_id: str, provider: str) -> dict | None:
         .execute()
     )
     return res.data[0] if res.data else None
+
+
+def delete_oauth_tokens(*, user_id: str, provider: str) -> None:
+    """リフレッシュトークンが失効（invalid_grant等）した連携を解除する。
+    ユーザーが外部でアクセス権を取り消した場合や、開発中アプリのリフレッシュトークンが
+    期限切れになった場合、保存されたトークンで永久にリフレッシュが失敗し続けるため、
+    行ごと削除して「未連携」状態に戻し、再連携を促す。
+    """
+    sb = get_supabase()
+    sb.table("oauth_tokens").delete().eq("user_id", user_id).eq("provider", provider).execute()
