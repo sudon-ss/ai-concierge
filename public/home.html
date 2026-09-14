@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>THE CONCIERGE ｜ 声で預ければ、秘書がいる。</title>
+<style>
+  :root {
+    color-scheme: light;
+    --navy: #0f223b;
+    --navy-soft: #33465f;
+    --gold: #b8935a;
+    --gold-light: #e8d3ac;
+    --bg: #faf7f2;
+    --line: #e4dccd;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--navy);
+    font-family: "Hiragino Sans", "Yu Gothic", "Noto Sans JP", sans-serif;
+    line-height: 1.8;
+  }
+  header {
+    background: var(--navy);
+    color: #f4ead8;
+    padding: 4rem 1.5rem 3.5rem;
+    text-align: center;
+  }
+  header .brand {
+    font-size: 1.15rem;
+    letter-spacing: 0.3em;
+    color: var(--gold);
+  }
+  header h1 {
+    margin: 1.1rem auto 0.8rem;
+    font-size: 1.6rem;
+    font-weight: 600;
+    max-width: 520px;
+  }
+  header p {
+    margin: 0 auto;
+    max-width: 480px;
+    font-size: 0.92rem;
+    color: #cdd8e6;
+  }
+  main {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 2.8rem 1.5rem 4rem;
+  }
+  .badge {
+    display: inline-block;
+    background: var(--gold-light);
+    color: #6a4f26;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    padding: 0.3rem 0.8rem;
+    border-radius: 999px;
+    margin-bottom: 2rem;
+  }
+  section {
+    margin-bottom: 2.4rem;
+    padding-bottom: 2.4rem;
+    border-bottom: 1px solid var(--line);
+  }
+  section:last-of-type { border-bottom: none; }
+  h2 {
+    font-size: 1.05rem;
+    border-left: 4px solid var(--gold);
+    padding-left: 0.7rem;
+    margin-bottom: 1rem;
+  }
+  p, li { font-size: 0.93rem; color: #2c3a4f; }
+  ul { padding-left: 1.4rem; margin: 0.6rem 0; }
+  li { margin-bottom: 0.5rem; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+  .card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 1rem 1.1rem;
+  }
+  .card h3 {
+    margin: 0 0 0.4rem;
+    font-size: 0.92rem;
+    color: var(--navy);
+  }
+  .card p { margin: 0; font-size: 0.85rem; color: var(--navy-soft); }
+  footer {
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--navy-soft);
+    padding: 1.5rem;
+  }
+</style>
+</head>
+<body>
+  <header>
+    <div class="brand">THE CONCIERGE</div>
+    <h1>声で預ければ、秘書がいる。</h1>
+    <p>会話ひとつでスケジュールとタスクを任せられる、多忙な意思決定者のためのAI秘書です。</p>
+  </header>
+  <main>
+    <span class="badge">現在、社内テスト運用中です</span>
+
+    <section>
+      <h2>THE CONCIERGEとは</h2>
+      <p>
+        THE CONCIERGEは、Googleカレンダー・Outlookカレンダーと連携し、テキストや音声での
+        ご指示だけでご予定の確認・登録・変更、タスクの管理までを担うAI秘書アプリです。
+        「頭の中から出して、信頼して預けられる存在がいること」を目指して開発しています。
+      </p>
+    </section>
+
+    <section>
+      <h2>できること</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>会話でのご予定管理</h3>
+          <p>「明日14時に会議を入れて」のように話しかけるだけで、空き時間の確認から登録まで完結します。</p>
+        </div>
+        <div class="card">
+          <h3>複数カレンダー対応</h3>
+          <p>1つのアカウント内で複数カレンダーを選び、重複のない一覧表示・同時登録ができます。</p>
+        </div>
+        <div class="card">
+          <h3>候補日の仮押さえ</h3>
+          <p>相手の返事待ちの間、候補枠が他の予定で埋まらないよう自動でブロックします。</p>
+        </div>
+        <div class="card">
+          <h3>毎朝のブリーフィング</h3>
+          <p>その日のご予定と期限の近いタスクを、毎朝まとめてお知らせします。</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>安心してお使いいただくために</h2>
+      <p>
+        カレンダーへのアクセス許可はGoogle／Microsoftの認証を通じて安全に行われ、
+        パスワードが本サービスに渡ることはありません。取得した情報の取り扱いについては
+        <a href="/privacy.html">プライバシーポリシー</a>をご確認ください。
+      </p>
+    </section>
+
+    <section>
+      <h2>お問い合わせ</h2>
+      <p>
+        本サービスに関するお問い合わせは
+        <a href="mailto:saint.babrus@gmail.com">saint.babrus@gmail.com</a> までご連絡ください。
+      </p>
+    </section>
+  </main>
+  <footer>THE CONCIERGE ／ 社内テスト版のご案内</footer>
+</body>
+</html>
