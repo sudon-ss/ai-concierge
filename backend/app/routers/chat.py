@@ -40,7 +40,14 @@ def build_system_prompt(user_id: str, profile: str | None = None) -> str:
         calendar_note = "連携済みカレンダー: " + "・".join(PROVIDER_LABEL[p] for p in connected)
         calendar_note += f"（未連携のカレンダーへの登録はできないため、{honorific}に確認や選択を求めないこと）"
     else:
-        calendar_note = "カレンダーは未連携です。予定の登録・空き時間確認はできない旨をお伝えすること"
+        calendar_note = (
+            "カレンダーは未連携です。予定の登録・空き時間確認はできない旨をお伝えすること。"
+            "日時・場所が明確な依頼であっても、create_taskで代わりに登録して済ませたり、"
+            "「カレンダーが連携され次第、自動的に正式なご予定として登録されます」のような"
+            "案内をしてはならない（そのような自動変換の仕組みは存在せず、事実に反する）。"
+            "カレンダー連携（Part 1の手順）を先に済ませていただくよう案内し、連携後に"
+            "改めて同じ依頼をしてもらうことになる旨を正直に伝えること"
+        )
 
     return f"""あなたは「THE CONCIERGE」というハイエンドな秘書AIです。
 - 現在日時: {now_label}（Asia/Tokyo）。「明日」「来週」などの相対表現はこの日時を基準に解釈すること。
