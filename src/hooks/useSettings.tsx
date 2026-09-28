@@ -11,6 +11,12 @@ import {
 import { getStorageItem, setStorageItem, STORAGE_KEYS } from '../lib/storage'
 import { getSession, hasBackend, putServerSettings } from '../lib/api'
 
+export const WEEKDAY_OPTIONS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const
+export type WeekdayCode = (typeof WEEKDAY_OPTIONS)[number]
+export const WEEKDAY_LABEL: Record<WeekdayCode, string> = {
+  mon: '月', tue: '火', wed: '水', thu: '木', fri: '金', sat: '土', sun: '日',
+}
+
 export interface AppSettings {
   briefingTime: string // "HH:MM" 24h
   reminderMinutes: number
@@ -21,6 +27,11 @@ export interface AppSettings {
     google: boolean
     outlook: boolean
   }
+  // 業務時間外ブロック: 空き時間提案から既定で除外する曜日・時間帯（接待等は別途AIが考慮）
+  blockingEnabled: boolean
+  blockedWeekdays: WeekdayCode[]
+  blockedStartHour: number
+  blockedEndHour: number
 }
 
 export const BRIEFING_TIME_OPTIONS = [
@@ -40,6 +51,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
     google: false,
     outlook: false,
   },
+  blockingEnabled: true,
+  blockedWeekdays: ['sat', 'sun'],
+  blockedStartHour: 22,
+  blockedEndHour: 8,
 }
 
 interface SettingsContextValue {
@@ -90,12 +105,20 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       briefing_time: settings.briefingTime,
       notification_enabled: settings.notificationEnabled,
       reminder_minutes: settings.reminderMinutes,
+      blocking_enabled: settings.blockingEnabled,
+      blocked_weekdays: settings.blockedWeekdays,
+      blocked_start_hour: settings.blockedStartHour,
+      blocked_end_hour: settings.blockedEndHour,
     }).catch(() => {})
   }, [
     settings.briefingEnabled,
     settings.briefingTime,
     settings.notificationEnabled,
     settings.reminderMinutes,
+    settings.blockingEnabled,
+    settings.blockedWeekdays,
+    settings.blockedStartHour,
+    settings.blockedEndHour,
   ])
 
   useEffect(() => {

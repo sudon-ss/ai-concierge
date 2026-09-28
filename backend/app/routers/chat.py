@@ -14,6 +14,7 @@ from ..config import settings
 from ..database import get_supabase
 from ..dependencies import get_current_user
 from ..models import ChatRequest, SessionUser
+from ..settings_store import get_settings
 from ..tools import TOOLS, run_tool
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
@@ -23,11 +24,44 @@ logger = logging.getLogger("concierge.chat")
 JST = ZoneInfo("Asia/Tokyo")
 
 WEEKDAY_JA = ["月", "火", "水", "木", "金", "土", "日"]
+WEEKDAY_LABEL = {"mon": "月", "tue": "火", "wed": "水", "thu": "木", "fri": "金", "sat": "土", "sun": "日"}
 
 PROVIDER_LABEL = {"google": "Google Calendar", "outlook": "Outlook"}
 
 # デモプロファイル（Settings > デモプロファイル）に応じた二人称。§6-2準拠
 HONORIFIC = {"ceo": "社長", "director": "役員", "cfo": "CFO様", None: "お客様"}
+
+
+def _blocked_hours_note(user_id: str) -> str:
+    """§UC-新: 業務時間外ブロック設定を元にした、空き時間提案の既定除外ガイダンス。
+    接待・会食・二次会等の正当な業務利用まで機械的に弾くと使い物にならないため、
+    get_free_slots側でハードに除外するのではなく、AIが状況に応じて適用可否を
+    判断できるようプロンプトでの「既定の除外」として伝えるに留める（ソフト優先）。
+    同じカレンダーをプライベートと兼用している場合も完全には防げない前提。
+    """
+    s = get_settings(user_id)
+    if not s.get("blocking_enabled", True):
+        return ""
+    days = [d for d in (s.get("blocked_weekdays") or []) if d in WEEKDAY_LABEL]
+    start_h, end_h = s.get("blocked_start_hour"), s.get("blocked_end_hour")
+
+    parts = []
+    if days:
+        parts.append("・".join(WEEKDAY_LABEL[d] for d in days) + "曜日")
+    if start_h is not None and end_h is not None and start_h != end_h:
+        parts.append(f"{start_h}時〜{end_h}時")
+    if not parts:
+        return ""
+
+    window = "と".join(parts)
+    return (
+        f"- お客様の設定により、{window}は「業務時間外」として空き時間提案の対象から既定で除外すること。"
+        "時間帯・曜日の指定が無い依頼（「来週空いてる日ある？」等）ではget_free_slotsの"
+        "date_from/date_to/weekdaysをこの時間帯にかからないよう組み立てること。"
+        "ただし、接待・会食・二次会・ゴルフなど明らかにこの時間帯を意図した依頼や、"
+        "「土曜だけど空いてる？」のようにこの時間帯を名指しで依頼された場合は、"
+        "この既定の除外を適用せず通常通り確認・提案すること"
+    )
 
 
 def build_system_prompt(user_id: str, profile: str | None = None) -> str:
@@ -49,6 +83,8 @@ def build_system_prompt(user_id: str, profile: str | None = None) -> str:
             "改めて同じ依頼をしてもらうことになる旨を正直に伝えること"
         )
 
+    blocked_hours_note = _blocked_hours_note(user_id)
+
     return f"""あなたは「THE CONCIERGE」というハイエンドな秘書AIです。
 - 現在日時: {now_label}（Asia/Tokyo）。「明日」「来週」などの相対表現はこの日時を基準に解釈すること。
   「来週」は次の月曜〜日曜（曜日指定が無ければ月曜〜金曜の平日を優先）、「今週末」は
@@ -63,6 +99,7 @@ def build_system_prompt(user_id: str, profile: str | None = None) -> str:
   ディナーなど夜の予定は17-21時、ランチは11-14時のように、依頼内容にふさわしい
   時間帯をdate_from/date_toで指定すること。用件の種類がはっきりしない場合は、
   日中の営業時間（9-19時）を既定とすること
+{blocked_hours_note}
 - 「空いてる日ある？」のように、期間そのものが一切指定されていない場合は、
   現在日時から2週間先までを既定の検索範囲とすること。その範囲で候補が
   不足する場合は、通常の「3件に満たない場合」の手順に従って期間を広げること

@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import clsx from 'clsx'
-import { Bell, BellRing, Calendar as CalIcon, Clock, Sparkles, UserCog, RefreshCw } from 'lucide-react'
+import { Bell, BellRing, Calendar as CalIcon, Clock, Moon, Sparkles, UserCog, RefreshCw } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { ProfileSelector } from '../components/ProfileSelector'
 import { CalendarSelector } from '../components/CalendarSelector'
+import { BlockedHoursEditor } from '../components/BlockedHoursEditor'
 import { useSettings, BRIEFING_TIME_OPTIONS, formatBriefingTime } from '../hooks/useSettings'
 import { useCalendarsData } from '../hooks/useCalendarsData'
 import { usePushNotifications } from '../hooks/usePushNotifications'
@@ -298,6 +299,22 @@ export function SettingsPage() {
           </select>
         </div>
         <PushSection />
+      </section>
+
+      <section className="card p-4">
+        <h3 className="flex items-center gap-2 text-sm font-semibold text-navy-800 pb-2">
+          <Moon size={16} className="text-gold-600" /> 業務時間の設定
+        </h3>
+        <BlockedHoursEditor
+          enabled={settings.blockingEnabled}
+          weekdays={settings.blockedWeekdays}
+          startHour={settings.blockedStartHour}
+          endHour={settings.blockedEndHour}
+          onChangeEnabled={(v) => updateSettings({ blockingEnabled: v })}
+          onChangeWeekdays={(v) => updateSettings({ blockedWeekdays: v })}
+          onChangeStartHour={(v) => updateSettings({ blockedStartHour: v })}
+          onChangeEndHour={(v) => updateSettings({ blockedEndHour: v })}
+        />
       </section>
 
       <section className="card p-4">

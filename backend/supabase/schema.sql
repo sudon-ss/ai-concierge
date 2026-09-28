@@ -43,6 +43,11 @@ create table user_settings (
   briefing_time text default '07:00',      -- "HH:MM"（Asia/Tokyo）
   notification_enabled boolean default true,
   reminder_minutes int default 5,
+  -- 業務時間外ブロック。空き時間提案でデフォルト除外する曜日・時間帯（AI側でソフトに適用、§UC-新）
+  blocking_enabled boolean default true,
+  blocked_weekdays text[] default array['sat', 'sun'],
+  blocked_start_hour int default 22,       -- 0-23時。開始>終了で日をまたぐ（22時〜翌8時等）
+  blocked_end_hour int default 8,
   updated_at timestamptz default now()
 );
 

@@ -330,6 +330,10 @@ export interface ServerSettings {
   briefing_time: string
   notification_enabled: boolean
   reminder_minutes: number
+  blocking_enabled: boolean
+  blocked_weekdays: string[]
+  blocked_start_hour: number
+  blocked_end_hour: number
 }
 
 export function getServerSettings(): Promise<ServerSettings> {
