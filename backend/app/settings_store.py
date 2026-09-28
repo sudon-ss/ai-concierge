@@ -10,6 +10,14 @@ DEFAULTS = {
     "briefing_time": "07:00",
     "notification_enabled": True,
     "reminder_minutes": 5,
+    # 業務時間外ブロック（§UC-新: 空き時間提案から土日・深夜をデフォルトで除外する設定）。
+    # 接待・会食等の正当な業務利用を弾かないよう、ここではDBに希望値を保存するだけに留め、
+    # 実際の適用（明示的な依頼なら無視する等の判断）はchat.pyのシステムプロンプト経由で
+    # AIに委ねる（get_free_slots側でハードに弾くと、100%締め出してしまい柔軟性が失われるため）
+    "blocking_enabled": True,
+    "blocked_weekdays": ["sat", "sun"],
+    "blocked_start_hour": 22,
+    "blocked_end_hour": 8,
 }
 
 

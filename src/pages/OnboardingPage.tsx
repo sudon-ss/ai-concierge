@@ -3,12 +3,18 @@ import { useNavigate } from 'react-router-dom'
 import { Check, ChevronLeft, ChevronRight, Bell, Calendar, Clock } from 'lucide-react'
 import clsx from 'clsx'
 import { useProfile } from '../hooks/useProfile'
-import { useSettings, BRIEFING_TIME_OPTIONS, formatBriefingTime } from '../hooks/useSettings'
+import {
+  useSettings,
+  BRIEFING_TIME_OPTIONS,
+  formatBriefingTime,
+  type WeekdayCode,
+} from '../hooks/useSettings'
 import { useCalendarsData } from '../hooks/useCalendarsData'
 import { PROFILES, type ProfileId } from '../types/profile'
 import { Wordmark } from '../components/Wordmark'
 import { ConciergeMark } from '../components/ConciergeMark'
 import { CalendarSelector } from '../components/CalendarSelector'
+import { BlockedHoursEditor } from '../components/BlockedHoursEditor'
 import { googleLoginUrl, outlookLoginUrl, type CalendarsResponse } from '../lib/api'
 
 type StepId = 'welcome' | 'profile' | 'calendar' | 'notification' | 'done'
@@ -106,6 +112,14 @@ export function OnboardingPage({ initialConnected }: { initialConnected?: string
               reminderMinutes={settings.reminderMinutes}
               onChangeBriefing={(v) => updateSettings({ briefingTime: v })}
               onChangeReminder={(v) => updateSettings({ reminderMinutes: v })}
+              blockingEnabled={settings.blockingEnabled}
+              blockedWeekdays={settings.blockedWeekdays}
+              blockedStartHour={settings.blockedStartHour}
+              blockedEndHour={settings.blockedEndHour}
+              onChangeBlockingEnabled={(v) => updateSettings({ blockingEnabled: v })}
+              onChangeBlockedWeekdays={(v) => updateSettings({ blockedWeekdays: v })}
+              onChangeBlockedStartHour={(v) => updateSettings({ blockedStartHour: v })}
+              onChangeBlockedEndHour={(v) => updateSettings({ blockedEndHour: v })}
             />
           )}
           {step === 'done' && <DoneStep />}
@@ -348,11 +362,27 @@ function NotificationStep({
   reminderMinutes,
   onChangeBriefing,
   onChangeReminder,
+  blockingEnabled,
+  blockedWeekdays,
+  blockedStartHour,
+  blockedEndHour,
+  onChangeBlockingEnabled,
+  onChangeBlockedWeekdays,
+  onChangeBlockedStartHour,
+  onChangeBlockedEndHour,
 }: {
   briefingTime: string
   reminderMinutes: number
   onChangeBriefing: (v: string) => void
   onChangeReminder: (v: number) => void
+  blockingEnabled: boolean
+  blockedWeekdays: WeekdayCode[]
+  blockedStartHour: number
+  blockedEndHour: number
+  onChangeBlockingEnabled: (v: boolean) => void
+  onChangeBlockedWeekdays: (v: WeekdayCode[]) => void
+  onChangeBlockedStartHour: (v: number) => void
+  onChangeBlockedEndHour: (v: number) => void
 }) {
   return (
     <div>
@@ -405,6 +435,19 @@ function NotificationStep({
               </select>
             </div>
           </div>
+        </div>
+
+        <div className="card p-4">
+          <BlockedHoursEditor
+            enabled={blockingEnabled}
+            weekdays={blockedWeekdays}
+            startHour={blockedStartHour}
+            endHour={blockedEndHour}
+            onChangeEnabled={onChangeBlockingEnabled}
+            onChangeWeekdays={onChangeBlockedWeekdays}
+            onChangeStartHour={onChangeBlockedStartHour}
+            onChangeEndHour={onChangeBlockedEndHour}
+          />
         </div>
       </div>
     </div>

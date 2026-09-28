@@ -65,6 +65,10 @@ class SettingsPatch(BaseModel):
     briefing_time: str | None = None
     notification_enabled: bool | None = None
     reminder_minutes: int | None = None
+    blocking_enabled: bool | None = None
+    blocked_weekdays: list[str] | None = None
+    blocked_start_hour: int | None = None
+    blocked_end_hour: int | None = None
 
 
 @router.get("/settings")
