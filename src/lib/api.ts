@@ -402,3 +402,20 @@ export function selectCalendars(
     },
   )
 }
+
+export interface CalendarNotices {
+  google: boolean
+  outlook: boolean
+}
+
+/** 連携が壊れている（要再連携の）プロバイダをDBのみの軽量な問い合わせで返す。
+ * Chat/Home/Schedule画面で都度呼ばれる想定のため、外部カレンダーAPIへはアクセスしない。
+ */
+export function getCalendarNotices(): Promise<CalendarNotices> {
+  return apiFetch<CalendarNotices>('/api/calendars/notices')
+}
+
+/** 「このカレンダーはもう使わないので通知不要」という意思表示。再連携すれば自動的に解除される */
+export function dismissCalendarNotice(provider: 'google' | 'outlook') {
+  return apiFetch<{ ok: boolean }>(`/api/calendars/${provider}/dismiss-notice`, { method: 'POST' })
+}

@@ -6,6 +6,7 @@ import { CalendarBadge } from '../components/CalendarBadge'
 import { MemoBlock } from '../components/MemoBlock'
 import { EventEditModal } from '../components/EventEditModal'
 import { CalendarGridView, type GridViewMode } from '../components/CalendarGridView'
+import { ConnectionNoticeBanner } from '../components/ConnectionNoticeBanner'
 import type { CalendarEvent } from '../types'
 import { deleteEventApi, getSession, hasBackend, listEvents, updateEventApi } from '../lib/api'
 
@@ -179,6 +180,7 @@ export function CalendarPage() {
 
   return (
     <div className="flex-1 overflow-y-auto px-4 py-4 max-w-2xl mx-auto w-full space-y-5">
+      <ConnectionNoticeBanner />
       <div className="flex items-start justify-between gap-2">
         <div>
           <p className="text-[10px] uppercase tracking-[0.2em] text-gold-600">Schedule</p>

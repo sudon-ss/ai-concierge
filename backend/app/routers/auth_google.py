@@ -4,7 +4,7 @@ import httpx
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import RedirectResponse
 
-from ..auth import create_session_token, get_or_create_user, save_oauth_tokens
+from ..auth import create_session_token, get_or_create_user, mark_connection_ok, save_oauth_tokens
 from ..config import settings
 
 router = APIRouter(prefix="/api/auth/google", tags=["auth"])
@@ -80,6 +80,7 @@ async def callback(code: str | None = None, error: str | None = None, state: str
         refresh_token=token_data.get("refresh_token"),
         expires_in=token_data["expires_in"],
     )
+    mark_connection_ok(user_id=user_id, provider="google")
 
     session_token = create_session_token(user_id, userinfo["email"])
     return RedirectResponse(

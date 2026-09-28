@@ -3,6 +3,7 @@ import { Bell, RotateCcw } from 'lucide-react'
 import { MessageBubble } from '../components/MessageBubble'
 import { InputBar } from '../components/InputBar'
 import { FlashOverlay } from '../components/FlashOverlay'
+import { ConnectionNoticeBanner } from '../components/ConnectionNoticeBanner'
 import { useProfile } from '../hooks/useProfile'
 import { useSettings } from '../hooks/useSettings'
 import type { CalendarEvent, ChatMessage, ExtractedDraft, FreeSlot, MessageContent, Task } from '../types'
@@ -864,6 +865,7 @@ export function ChatPage() {
         ref={scrollRef}
         className="flex-1 overflow-y-auto px-4 pt-3 pb-4 space-y-3 max-w-2xl mx-auto w-full"
       >
+        <ConnectionNoticeBanner />
         {/* 補助アクション（スクロールで隠れる） */}
         <div className="flex justify-end gap-3">
           <button
