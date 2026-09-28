@@ -129,6 +129,16 @@ async def get_free_slots(
     slots: list[dict] = []
     tentative_slots: list[dict] = []
     cursor = time_min
+    # 「本日中」のように当日を含む範囲を指定された場合、date_fromの時刻が既に過ぎている
+    # ことがある（例: 13時に「今日空いてる？」と聞かれ、date_fromが9:00のまま渡される）。
+    # このままだと過去の時刻を候補として提示してしまうため、現在時刻より前ならそこまで
+    # 進める。次の30分単位に切り上げる。day_start_h/mは変更しない（複数日探索時、
+    # 2日目以降は元の時間帯のまま維持するため）。
+    now = datetime.now(JST)
+    if now.second or now.microsecond or now.minute % 30:
+        now = (now + timedelta(minutes=30 - now.minute % 30)).replace(second=0, microsecond=0)
+    if cursor < now:
+        cursor = now
     last_picked: datetime | None = None  # 直近で候補にした日時（偏り防止の間隔チェック用）
 
     while cursor < time_max and len(slots) < max_slots:
