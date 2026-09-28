@@ -51,6 +51,19 @@ create table user_settings (
   updated_at timestamptz default now()
 );
 
+-- calendar_connection_state: カレンダー連携が壊れた場合にChat/Home/Schedule画面へ
+-- 再連携を促す通知を出すための状態管理。oauth_tokensは連携解除時に行ごと削除されるため、
+-- 「一度も連携していない」ユーザーと「連携が壊れて切れた」ユーザーを区別できるよう独立させている
+create table calendar_connection_state (
+  user_id uuid not null references users(id) on delete cascade,
+  provider text not null check (provider in ('google', 'outlook')),
+  ever_connected boolean not null default false,
+  broken_since timestamptz,             -- NULLでなければ再連携が必要（dismissedがtrueでなければ通知対象）
+  dismissed boolean not null default false,  -- 「もう使わないので通知不要」という意思表示
+  updated_at timestamptz default now(),
+  primary key (user_id, provider)
+);
+
 -- push_subscriptions: Web Push の宛先。1ユーザーが複数端末を持つ想定で複数行を許す
 create table push_subscriptions (
   id uuid primary key default gen_random_uuid(),
@@ -130,6 +143,7 @@ alter table messages enable row level security;
 alter table user_settings enable row level security;
 alter table push_subscriptions enable row level security;
 alter table sent_notifications enable row level security;
+alter table calendar_connection_state enable row level security;
 
 create policy "own row only" on users for all using (auth.uid() = id);
 create policy "own rows only" on user_identities for all using (auth.uid() = user_id);
@@ -140,3 +154,4 @@ create policy "own rows only" on messages for all using (auth.uid() = user_id);
 create policy "own row only" on user_settings for all using (auth.uid() = user_id);
 create policy "own rows only" on push_subscriptions for all using (auth.uid() = user_id);
 create policy "own rows only" on sent_notifications for all using (auth.uid() = user_id);
+create policy "own rows only" on calendar_connection_state for all using (auth.uid() = user_id);

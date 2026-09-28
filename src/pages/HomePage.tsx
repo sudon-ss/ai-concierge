@@ -5,6 +5,7 @@ import { useProfile } from '../hooks/useProfile'
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition'
 import { Wordmark } from '../components/Wordmark'
 import { ConciergeMark } from '../components/ConciergeMark'
+import { ConnectionNoticeBanner } from '../components/ConnectionNoticeBanner'
 import { getSession, hasBackend, listEvents } from '../lib/api'
 import type { CalendarEvent } from '../types'
 
@@ -77,6 +78,8 @@ export function HomePage() {
           {profile.label} 様 へ
         </p>
       </div>
+
+      <ConnectionNoticeBanner />
 
       {/* マイクボタン */}
       <div className="flex flex-col items-center mb-8">

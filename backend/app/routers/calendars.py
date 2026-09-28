@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, field_validator
 
-from ..auth import get_oauth_tokens, set_calendar_selection
+from ..auth import get_connection_notices, get_oauth_tokens, set_calendar_selection, set_connection_dismissed
 from ..calendar_service import list_calendars as fetch_calendars
 from ..dependencies import get_current_user
 from ..models import CalendarSource, SessionUser
@@ -9,6 +9,26 @@ from ..models import CalendarSource, SessionUser
 router = APIRouter(prefix="/api/calendars", tags=["calendars"])
 
 MAX_SELECTED_CALENDARS = 3
+
+
+@router.get("/notices")
+def get_calendar_notices(user: SessionUser = Depends(get_current_user)):
+    """Chat/Home/Schedule画面で再連携を促す通知を出すべきかどうか。
+    DBのみの軽量な問い合わせで、外部カレンダーAPIへは一切アクセスしない
+    （各画面の表示のたびに呼ばれる想定のため）。
+    """
+    notices = get_connection_notices(user.user_id)
+    return {
+        "google": notices.get("google", False),
+        "outlook": notices.get("outlook", False),
+    }
+
+
+@router.post("/{provider}/dismiss-notice")
+def dismiss_calendar_notice(provider: CalendarSource, user: SessionUser = Depends(get_current_user)):
+    """「このカレンダーはもう使わないので通知不要」という意思表示。再連携すれば自動的に解除される。"""
+    set_connection_dismissed(user_id=user.user_id, provider=provider, dismissed=True)
+    return {"ok": True}
 
 
 @router.get("")

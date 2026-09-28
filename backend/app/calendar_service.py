@@ -8,7 +8,7 @@ import httpx
 from .adapters.base import CalendarAdapter
 from .adapters.google_calendar import GoogleCalendarAdapter, list_google_calendars, refresh_google_token
 from .adapters.outlook_calendar import OutlookCalendarAdapter, list_outlook_calendars, refresh_microsoft_token
-from .auth import delete_oauth_tokens, get_oauth_tokens, save_oauth_tokens
+from .auth import delete_oauth_tokens, get_oauth_tokens, mark_connection_broken, save_oauth_tokens
 
 REFRESH_BUFFER_SECONDS = 120
 
@@ -51,6 +51,7 @@ async def _get_valid_token_row(user_id: str, provider: str) -> dict | None:
             # 保存済みトークンがDBに残り続ける限り毎回同じ400エラーで落ちてしまうため。
             if e.response.status_code == 400:
                 delete_oauth_tokens(user_id=user_id, provider=provider)
+                mark_connection_broken(user_id=user_id, provider=provider)
                 return None
             raise
         save_oauth_tokens(
