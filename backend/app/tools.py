@@ -650,7 +650,15 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "calendar": {"type": "string", "enum": ["google", "outlook"]},
-                "title": {"type": "string"},
+                "title": {
+                    "type": "string",
+                    "description": (
+                        "予定名として自然な体言止めの短いタイトル。ユーザーの発話をそのまま使わないこと。"
+                        "「明日」「来週」等の日時表現や、「〜しといて」「〜したい」「〜お願いします」等の"
+                        "依頼の言い回しは取り除くこと。例:「明日会議を14時に入れといて」→"
+                        "「会議」、「明日田中さんとミーティングしたいけど」→「田中様とのミーティング」"
+                    ),
+                },
                 "start": {"type": "string", "description": "ISO8601（必ずタイムゾーンオフセットを含めること。例: 2026-10-01T18:00:00+09:00）"},
                 "end": {"type": "string", "description": "ISO8601（必ずタイムゾーンオフセットを含めること）"},
                 "location": {"type": "string"},
