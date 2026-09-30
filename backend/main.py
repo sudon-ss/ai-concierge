@@ -9,6 +9,7 @@ from app import scheduler
 from app.config import settings
 from app.routers import (
     auth_google,
+    auth_link,
     auth_outlook,
     briefing,
     calendars,
@@ -44,6 +45,7 @@ app.add_middleware(
 
 app.include_router(auth_google.router)
 app.include_router(auth_outlook.router)
+app.include_router(auth_link.router)
 app.include_router(chat.router)
 app.include_router(calendars.router)
 app.include_router(events.router)

@@ -1,3 +1,5 @@
+import base64
+import json
 import time
 import uuid
 from datetime import datetime, timezone
@@ -9,6 +11,8 @@ from .database import get_supabase
 
 ALGORITHM = "HS256"
 SESSION_TTL_SECONDS = 60 * 60 * 24 * 30  # 30日
+LINK_TTL_SECONDS = 60 * 10  # 10分。OAuthのstateパラメータに載せてURLを往復するため、
+# 30日間有効なセッショントークンそのものを晒さないよう、この用途専用の短命トークンを使う
 
 
 def create_session_token(user_id: str, email: str) -> str:
@@ -26,6 +30,59 @@ def decode_session_token(token: str) -> dict | None:
         return jwt.decode(token, settings.session_secret, algorithms=[ALGORITHM])
     except JWTError:
         return None
+
+
+def create_link_token(user_id: str) -> str:
+    """既にログイン中のユーザーが、別プロバイダのカレンダーを自分のアカウントへ
+    追加連携する際に使う短命トークン。用途をpurposeで区別し、通常のセッション
+    トークンとして誤用されないようにする。
+    """
+    payload = {
+        "sub": user_id,
+        "purpose": "link",
+        "iat": int(time.time()),
+        "exp": int(time.time()) + LINK_TTL_SECONDS,
+    }
+    return jwt.encode(payload, settings.session_secret, algorithm=ALGORITHM)
+
+
+def decode_link_token(token: str) -> str | None:
+    try:
+        payload = jwt.decode(token, settings.session_secret, algorithms=[ALGORITHM])
+    except JWTError:
+        return None
+    if payload.get("purpose") != "link":
+        return None
+    return payload.get("sub")
+
+
+def encode_oauth_state(*, redirect_to: str | None = None, link_token: str | None = None) -> str:
+    payload: dict = {}
+    if redirect_to:
+        payload["r"] = redirect_to
+    if link_token:
+        payload["l"] = link_token
+    if not payload:
+        return ""
+    raw = json.dumps(payload, separators=(",", ":")).encode()
+    return base64.urlsafe_b64encode(raw).decode().rstrip("=")
+
+
+def decode_oauth_state(state: str | None) -> dict:
+    """OAuthのstateパラメータ（Google/Microsoftからそのまま往復してくる）をデコードする。
+    "onboarding" という生文字列は旧バージョンのフロントエンドとの後方互換のために特別扱いする。
+    """
+    if not state:
+        return {}
+    if state == "onboarding":
+        return {"r": "onboarding"}
+    try:
+        padded = state + "=" * (-len(state) % 4)
+        raw = base64.urlsafe_b64decode(padded.encode()).decode()
+        data = json.loads(raw)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
 
 
 def get_or_create_user(*, provider: str, provider_user_id: str, email: str, display_name: str | None) -> str:
@@ -62,6 +119,33 @@ def get_or_create_user(*, provider: str, provider_user_id: str, email: str, disp
         }
     ).execute()
     return user_id
+
+
+def link_provider_identity(*, user_id: str, provider: str, provider_user_id: str) -> None:
+    """既にログイン中のユーザーへ、別プロバイダのアカウントを追加で紐付ける
+    （例: Googleでログイン中に、Googleとは異なるメールアドレスのOutlookアカウントを
+    カレンダー連携として追加する場合）。get_or_create_userはメールアドレスが一致
+    しないと同一ユーザーとして統合できないため、既にセッションで本人確認済みの
+    場合はそちらを優先し、メールアドレス不一致で別ユーザーが生まれるのを防ぐ。
+
+    そのprovider_user_idが既に何らかのuser_idに紐付いている場合（例えば、この
+    プロバイダを過去に単独でログインに使ったことがある等）は、意図せず別ユーザーの
+    アカウントを乗っ取ってしまわないよう何もしない。
+    """
+    sb = get_supabase()
+    existing = (
+        sb.table("user_identities")
+        .select("user_id")
+        .eq("provider", provider)
+        .eq("provider_user_id", provider_user_id)
+        .limit(1)
+        .execute()
+    )
+    if existing.data:
+        return
+    sb.table("user_identities").insert(
+        {"user_id": user_id, "provider": provider, "provider_user_id": provider_user_id}
+    ).execute()
 
 
 def save_oauth_tokens(

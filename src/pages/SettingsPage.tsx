@@ -141,7 +141,7 @@ export function SettingsPage() {
     settings.calendarConnected.outlook,
   )
 
-  const handleToggleCalendar = (provider: 'google' | 'outlook') => {
+  const handleToggleCalendar = async (provider: 'google' | 'outlook') => {
     const connected = settings.calendarConnected[provider]
     if (!backendConnected) {
       // バックエンド未設定（VITE_API_BASE_URL未設定）時はデモ用のローカルトグルのまま
@@ -154,7 +154,7 @@ export function SettingsPage() {
       clearSession()
       return
     }
-    window.location.href = provider === 'google' ? googleLoginUrl() : outlookLoginUrl()
+    window.location.href = provider === 'google' ? await googleLoginUrl() : await outlookLoginUrl()
   }
 
   return (

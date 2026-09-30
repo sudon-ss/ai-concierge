@@ -4,7 +4,15 @@ import httpx
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import RedirectResponse
 
-from ..auth import create_session_token, get_or_create_user, mark_connection_ok, save_oauth_tokens
+from ..auth import (
+    create_session_token,
+    decode_link_token,
+    decode_oauth_state,
+    get_or_create_user,
+    link_provider_identity,
+    mark_connection_ok,
+    save_oauth_tokens,
+)
 from ..config import settings
 
 router = APIRouter(prefix="/api/auth/google", tags=["auth"])
@@ -40,9 +48,10 @@ def login(state: str | None = None):
 
 @router.get("/callback")
 async def callback(code: str | None = None, error: str | None = None, state: str | None = None):
-    # stateはオンボーディング画面からの接続かどうかを判別するためだけに使う
-    # （オンボーディング側はカレンダー選択ステップへ戻す必要があるため、既定の/settingsとは別経路にする）
-    target_path = "/onboarding" if state == "onboarding" else "/settings"
+    # stateには「オンボーディング画面からの接続か」と「既にログイン中のユーザーへの
+    # 追加連携か」の2つの情報をエンコードして載せている（encode_oauth_state参照）
+    parsed_state = decode_oauth_state(state)
+    target_path = "/onboarding" if parsed_state.get("r") == "onboarding" else "/settings"
     if error or not code:
         return RedirectResponse(f"{settings.frontend_origin}{target_path}?error=google_{error or 'no_code'}")
 
@@ -67,12 +76,21 @@ async def callback(code: str | None = None, error: str | None = None, state: str
         userinfo_resp.raise_for_status()
         userinfo = userinfo_resp.json()
 
-    user_id = get_or_create_user(
-        provider="google",
-        provider_user_id=userinfo["sub"],
-        email=userinfo["email"],
-        display_name=userinfo.get("name"),
-    )
+    # 既にログイン中（=別プロバイダで連携済み）のユーザーが、メールアドレスの異なる
+    # Googleアカウントを追加で連携しようとした場合、get_or_create_userのメール一致判定
+    # では別ユーザーとして扱われてしまう。stateに載ったリンク用トークンで本人確認できた
+    # 場合はそちらのuser_idを優先し、意図しないアカウント分裂を防ぐ
+    linked_user_id = decode_link_token(parsed_state["l"]) if parsed_state.get("l") else None
+    if linked_user_id:
+        user_id = linked_user_id
+        link_provider_identity(user_id=user_id, provider="google", provider_user_id=userinfo["sub"])
+    else:
+        user_id = get_or_create_user(
+            provider="google",
+            provider_user_id=userinfo["sub"],
+            email=userinfo["email"],
+            display_name=userinfo.get("name"),
+        )
     save_oauth_tokens(
         user_id=user_id,
         provider="google",

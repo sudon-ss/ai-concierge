@@ -8,6 +8,11 @@ const PROVIDER_LABEL = { google: 'Google Calendar', outlook: 'Outlook' } as cons
  * Chat/Home/Scheduleの各画面共通。connection_stateが「一度も連携したことが無い」の
  * 場合は表示しない（そもそも使っていないプロバイダに再連携を勧めても意味が無いため）。
  */
+const reconnect = async (provider: 'google' | 'outlook') => {
+  const url = provider === 'google' ? await googleLoginUrl() : await outlookLoginUrl()
+  window.location.href = url
+}
+
 export function ConnectionNoticeBanner() {
   const { notices, dismiss } = useConnectionNotices()
   const broken = (['google', 'outlook'] as const).filter((p) => notices[p])
@@ -26,12 +31,13 @@ export function ConnectionNoticeBanner() {
               {PROVIDER_LABEL[provider]}との連携が切れております。ご予定の確認・登録ができない状態でございます。
             </p>
             <div className="flex items-center gap-3 mt-1.5">
-              <a
-                href={provider === 'google' ? googleLoginUrl() : outlookLoginUrl()}
+              <button
+                type="button"
+                onClick={() => reconnect(provider)}
                 className="text-xs font-semibold text-red-700 underline underline-offset-2 hover:text-red-900"
               >
                 再連携する
-              </a>
+              </button>
               <button
                 type="button"
                 onClick={() => dismiss(provider)}

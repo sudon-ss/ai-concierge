@@ -68,14 +68,46 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>
 }
 
+function getLinkToken(): Promise<{ token: string }> {
+  return apiFetch<{ token: string }>('/api/auth/link-token')
+}
+
+/** base64urlエンコード（パディング無し）。stateパラメータはURLを往復するため、
+ * 標準base64の+/=がそのまま入らないようにする。
+ */
+function toBase64Url(json: string): string {
+  return btoa(json).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+/** 既にログイン中の場合、新しく連携するプロバイダを「別ユーザー」として作らず
+ * 今のアカウントに追加連携できるよう、短命なリンク用トークンをstateに載せる。
+ * メールアドレスが違うGoogle/Outlookアカウントを組み合わせて使う人がいるため、
+ * これが無いと2つ目に連携した方だけが有効な、別々のアカウントに分裂してしまう。
+ */
+async function buildOAuthState(redirectTo?: 'onboarding'): Promise<string> {
+  const payload: Record<string, string> = {}
+  if (redirectTo) payload.r = redirectTo
+  if (getSession()) {
+    try {
+      const { token } = await getLinkToken()
+      payload.l = token
+    } catch {
+      // リンクトークンが取れなくても致命的ではない（従来通りメール一致で解決されるだけ）
+    }
+  }
+  return Object.keys(payload).length > 0 ? toBase64Url(JSON.stringify(payload)) : ''
+}
+
 /** redirectTo='onboarding' を渡すと、認証後にオンボーディングのカレンダーステップへ戻る */
-export function googleLoginUrl(redirectTo?: 'onboarding'): string {
-  const qs = redirectTo ? `?state=${redirectTo}` : ''
+export async function googleLoginUrl(redirectTo?: 'onboarding'): Promise<string> {
+  const state = await buildOAuthState(redirectTo)
+  const qs = state ? `?state=${encodeURIComponent(state)}` : ''
   return `${API_BASE}/api/auth/google/login${qs}`
 }
 
-export function outlookLoginUrl(redirectTo?: 'onboarding'): string {
-  const qs = redirectTo ? `?state=${redirectTo}` : ''
+export async function outlookLoginUrl(redirectTo?: 'onboarding'): Promise<string> {
+  const state = await buildOAuthState(redirectTo)
+  const qs = state ? `?state=${encodeURIComponent(state)}` : ''
   return `${API_BASE}/api/auth/outlook/login${qs}`
 }
 
