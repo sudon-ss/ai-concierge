@@ -15,7 +15,9 @@ import { Wordmark } from '../components/Wordmark'
 import { ConciergeMark } from '../components/ConciergeMark'
 import { CalendarSelector } from '../components/CalendarSelector'
 import { BlockedHoursEditor } from '../components/BlockedHoursEditor'
-import { googleLoginUrl, outlookLoginUrl, type CalendarsResponse } from '../lib/api'
+import { googleLoginUrl, outlookLoginUrl, getSession, type CalendarsResponse } from '../lib/api'
+
+const PROVIDER_LABEL = { google: 'Google Calendar', outlook: 'Outlook' } as const
 
 type StepId = 'welcome' | 'profile' | 'calendar' | 'notification' | 'done'
 const STEPS: StepId[] = ['welcome', 'profile', 'calendar', 'notification', 'done']
@@ -58,6 +60,15 @@ export function OnboardingPage({ initialConnected }: { initialConnected?: string
       // バックエンド未設定（VITE_API_BASE_URL未設定）時はデモ用のローカルトグルのまま
       updateCalendar(provider, true)
       return
+    }
+    if (getSession()) {
+      // 1つ目の連携が終わった直後は既にログイン中のため、2つ目以降は
+      // 「今のアカウントに追加連携する」操作になる。意図せず違うアカウントと
+      // 紐付けてしまわないよう、実行前に一度確認する
+      const ok = window.confirm(
+        `現在ログイン中のアカウントに、${PROVIDER_LABEL[provider]}のカレンダーを追加で連携します。よろしいですか？`,
+      )
+      if (!ok) return
     }
     window.location.href =
       provider === 'google' ? await googleLoginUrl('onboarding') : await outlookLoginUrl('onboarding')

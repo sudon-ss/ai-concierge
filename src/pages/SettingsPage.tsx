@@ -8,7 +8,9 @@ import { BlockedHoursEditor } from '../components/BlockedHoursEditor'
 import { useSettings, BRIEFING_TIME_OPTIONS, formatBriefingTime } from '../hooks/useSettings'
 import { useCalendarsData } from '../hooks/useCalendarsData'
 import { usePushNotifications } from '../hooks/usePushNotifications'
-import { googleLoginUrl, outlookLoginUrl, clearSession } from '../lib/api'
+import { googleLoginUrl, outlookLoginUrl, clearSession, getSession } from '../lib/api'
+
+const PROVIDER_LABEL = { google: 'Google Calendar', outlook: 'Outlook' } as const
 
 /** アプリを閉じている間もお知らせを受け取るための設定 */
 function PushSection() {
@@ -153,6 +155,14 @@ export function SettingsPage() {
       updateCalendar(provider, false)
       clearSession()
       return
+    }
+    if (getSession()) {
+      // 既にログイン中の場合、これは「別プロバイダを今のアカウントに追加連携する」操作になる。
+      // 意図せず違うアカウントと紐付けてしまわないよう、実行前に一度確認する
+      const ok = window.confirm(
+        `現在ログイン中のアカウントに、${PROVIDER_LABEL[provider]}のカレンダーを追加で連携します。よろしいですか？`,
+      )
+      if (!ok) return
     }
     window.location.href = provider === 'google' ? await googleLoginUrl() : await outlookLoginUrl()
   }
