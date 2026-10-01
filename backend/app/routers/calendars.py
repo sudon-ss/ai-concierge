@@ -1,7 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, field_validator
 
-from ..auth import get_connection_notices, get_oauth_tokens, set_calendar_selection, set_connection_dismissed
+from ..auth import (
+    get_connection_notices,
+    get_oauth_tokens,
+    set_calendar_selection,
+    set_connection_dismissed,
+    unlink_provider,
+)
 from ..calendar_service import list_calendars as fetch_calendars
 from ..dependencies import get_current_user
 from ..models import CalendarSource, SessionUser
@@ -28,6 +34,17 @@ def get_calendar_notices(user: SessionUser = Depends(get_current_user)):
 def dismiss_calendar_notice(provider: CalendarSource, user: SessionUser = Depends(get_current_user)):
     """「このカレンダーはもう使わないので通知不要」という意思表示。再連携すれば自動的に解除される。"""
     set_connection_dismissed(user_id=user.user_id, provider=provider, dismissed=True)
+    return {"ok": True}
+
+
+@router.delete("/{provider}")
+def unlink_calendar(provider: CalendarSource, user: SessionUser = Depends(get_current_user)):
+    """カレンダー連携を解除する（ユーザー自身の意思による）。トークンだけでなく
+    user_identitiesの紐付けも外すため、次に連携し直すときは今のセッションへ
+    改めて明示的に紐付けられる（別メールアドレスでの連携し直し・付け替えを含む）。
+    セッション自体は維持する（もう一方のプロバイダのデータ・ログイン状態に影響しない）。
+    """
+    unlink_provider(user_id=user.user_id, provider=provider)
     return {"ok": True}
 
 

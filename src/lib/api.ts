@@ -68,15 +68,25 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>
 }
 
+/** 遷移先（onboarding/settings）に加え、既にログイン中なら現在のセッションを
+ *  そのままstateへ乗せる。Google/Outlookで登録メールアドレスが違う人は多く、
+ *  メール一致だけでは同一人物の統合ができないため、ログイン中に「もう一方の
+ *  カレンダーも連携する」操作では、メールではなく今のセッション（=今のuser_id）に
+ *  明示的に紐付ける。stateは `"<target>"` または `"<target>|<セッショントークン>"`。
+ */
+function buildAuthState(redirectTo?: 'onboarding'): string {
+  const target = redirectTo ?? 'settings'
+  const session = getSession()
+  return session ? `${target}|${session}` : target
+}
+
 /** redirectTo='onboarding' を渡すと、認証後にオンボーディングのカレンダーステップへ戻る */
 export function googleLoginUrl(redirectTo?: 'onboarding'): string {
-  const qs = redirectTo ? `?state=${redirectTo}` : ''
-  return `${API_BASE}/api/auth/google/login${qs}`
+  return `${API_BASE}/api/auth/google/login?state=${encodeURIComponent(buildAuthState(redirectTo))}`
 }
 
 export function outlookLoginUrl(redirectTo?: 'onboarding'): string {
-  const qs = redirectTo ? `?state=${redirectTo}` : ''
-  return `${API_BASE}/api/auth/outlook/login${qs}`
+  return `${API_BASE}/api/auth/outlook/login?state=${encodeURIComponent(buildAuthState(redirectTo))}`
 }
 
 export interface ChatApiResponse {
@@ -405,6 +415,11 @@ export function selectCalendars(
       body: JSON.stringify({ calendar_ids: calendarIds, write_calendar_ids: writeCalendarIds }),
     },
   )
+}
+
+/** カレンダー連携を解除する（トークン・紐付けともにサーバー側から削除。セッションは維持） */
+export function unlinkCalendar(provider: 'google' | 'outlook') {
+  return apiFetch<{ ok: boolean }>(`/api/calendars/${provider}`, { method: 'DELETE' })
 }
 
 export interface CalendarNotices {

@@ -8,7 +8,7 @@ import { BlockedHoursEditor } from '../components/BlockedHoursEditor'
 import { useSettings, BRIEFING_TIME_OPTIONS, formatBriefingTime } from '../hooks/useSettings'
 import { useCalendarsData } from '../hooks/useCalendarsData'
 import { usePushNotifications } from '../hooks/usePushNotifications'
-import { googleLoginUrl, outlookLoginUrl, clearSession } from '../lib/api'
+import { googleLoginUrl, outlookLoginUrl, unlinkCalendar } from '../lib/api'
 
 /** アプリを閉じている間もお知らせを受け取るための設定 */
 function PushSection() {
@@ -141,7 +141,9 @@ export function SettingsPage() {
     settings.calendarConnected.outlook,
   )
 
-  const handleToggleCalendar = (provider: 'google' | 'outlook') => {
+  const [unlinking, setUnlinking] = useState<'google' | 'outlook' | null>(null)
+
+  const handleToggleCalendar = async (provider: 'google' | 'outlook') => {
     const connected = settings.calendarConnected[provider]
     if (!backendConnected) {
       // バックエンド未設定（VITE_API_BASE_URL未設定）時はデモ用のローカルトグルのまま
@@ -149,9 +151,20 @@ export function SettingsPage() {
       return
     }
     if (connected) {
-      // 解除はローカル表示上のみ（サーバー側のトークン取り消しはPhase 1後続タスク）
-      updateCalendar(provider, false)
-      clearSession()
+      const label = provider === 'google' ? 'Google Calendar' : 'Outlook'
+      if (!window.confirm(`${label}との連携を解除してもよろしいでしょうか？\n（ログイン状態は維持されます。再連携すればまた使えます）`)) {
+        return
+      }
+      setUnlinking(provider)
+      try {
+        await unlinkCalendar(provider)
+        updateCalendar(provider, false)
+        refreshCalendars()
+      } catch {
+        window.alert('解除に失敗いたしました。もう一度お試しくださいませ。')
+      } finally {
+        setUnlinking(null)
+      }
       return
     }
     window.location.href = provider === 'google' ? googleLoginUrl() : outlookLoginUrl()
@@ -193,14 +206,15 @@ export function SettingsPage() {
           <button
             type="button"
             onClick={() => handleToggleCalendar('google')}
+            disabled={unlinking === 'google'}
             className={clsx(
-              'text-xs font-semibold rounded-md px-3 py-1.5',
+              'text-xs font-semibold rounded-md px-3 py-1.5 disabled:opacity-50',
               settings.calendarConnected.google
                 ? 'bg-gold-500 text-navy-900 hover:bg-gold-600'
                 : 'btn-secondary',
             )}
           >
-            {settings.calendarConnected.google ? '解除' : '連携する'}
+            {unlinking === 'google' ? '解除中…' : settings.calendarConnected.google ? '解除' : '連携する'}
           </button>
         </div>
         {calendarsData && (
@@ -220,14 +234,15 @@ export function SettingsPage() {
           <button
             type="button"
             onClick={() => handleToggleCalendar('outlook')}
+            disabled={unlinking === 'outlook'}
             className={clsx(
-              'text-xs font-semibold rounded-md px-3 py-1.5',
+              'text-xs font-semibold rounded-md px-3 py-1.5 disabled:opacity-50',
               settings.calendarConnected.outlook
                 ? 'bg-gold-500 text-navy-900 hover:bg-gold-600'
                 : 'btn-secondary',
             )}
           >
-            {settings.calendarConnected.outlook ? '解除' : '連携する'}
+            {unlinking === 'outlook' ? '解除中…' : settings.calendarConnected.outlook ? '解除' : '連携する'}
           </button>
         </div>
         {calendarsData && (
