@@ -4,7 +4,14 @@ import httpx
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import RedirectResponse
 
-from ..auth import create_session_token, get_or_create_user, mark_connection_ok, save_oauth_tokens
+from ..auth import (
+    IdentityLinkedToAnotherUserError,
+    create_session_token,
+    get_or_create_user,
+    mark_connection_ok,
+    parse_oauth_state,
+    save_oauth_tokens,
+)
 from ..config import settings
 
 router = APIRouter(prefix="/api/auth/outlook", tags=["auth"])
@@ -36,8 +43,9 @@ def login(state: str | None = None):
 
 @router.get("/callback")
 async def callback(code: str | None = None, error: str | None = None, state: str | None = None):
-    # stateはオンボーディング画面からの接続かどうかを判別するためだけに使う
-    target_path = "/onboarding" if state == "onboarding" else "/settings"
+    # stateは「オンボーディング画面からの接続か」の判別と、ログイン中のセッションへの
+    # 連携（メールアドレス不一致でも同一人物として統合するため）の2つに使う
+    target_path, link_user_id = parse_oauth_state(state)
     if error or not code:
         return RedirectResponse(f"{settings.frontend_origin}{target_path}?error=outlook_{error or 'no_code'}")
 
@@ -65,12 +73,16 @@ async def callback(code: str | None = None, error: str | None = None, state: str
         me = me_resp.json()
 
     email = me.get("mail") or me.get("userPrincipalName")
-    user_id = get_or_create_user(
-        provider="outlook",
-        provider_user_id=me["id"],
-        email=email,
-        display_name=me.get("displayName"),
-    )
+    try:
+        user_id = get_or_create_user(
+            provider="outlook",
+            provider_user_id=me["id"],
+            email=email,
+            display_name=me.get("displayName"),
+            link_user_id=link_user_id,
+        )
+    except IdentityLinkedToAnotherUserError:
+        return RedirectResponse(f"{settings.frontend_origin}{target_path}?error=outlook_linked_elsewhere")
     save_oauth_tokens(
         user_id=user_id,
         provider="outlook",

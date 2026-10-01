@@ -1,0 +1,110 @@
+[
+ {
+  "id": "U1",
+  "area": "画面(HOME)",
+  "title": "HOMEが表示され横スクロールも出ない(375px)",
+  "expect": "表示OK",
+  "actual": "表示OK",
+  "verdict": "PASS",
+  "note": ""
+ },
+ {
+  "id": "U2",
+  "area": "画面(TASK)",
+  "title": "空欄のまま「追加」→既定名「新しいタスク」で登録される",
+  "expect": "入力必須の警告",
+  "actual": "既定名で登録された（空タスクは作られない）",
+  "verdict": "PASS",
+  "note": "警告は出ず既定名で登録される仕様"
+ },
+ {
+  "id": "U3",
+  "area": "画面(TASK)",
+  "title": "UIで作成したタスクがサーバーへ保存される",
+  "expect": "DBに存在",
+  "actual": "存在",
+  "verdict": "PASS",
+  "note": ""
+ },
+ {
+  "id": "U4",
+  "area": "画面(TASK)",
+  "title": "HTMLタグ入りの件名が無害に表示される(XSS)",
+  "expect": "タグは文字のまま表示",
+  "actual": "文字のまま表示、img/script注入なし",
+  "verdict": "PASS",
+  "note": ""
+ },
+ {
+  "id": "U5",
+  "area": "画面(TASK)",
+  "title": "編集・完了・完了取消・削除がUIから動く",
+  "expect": "全て反映",
+  "actual": "全て反映しサーバーからも消えた",
+  "verdict": "PASS",
+  "note": "削除は確認ダイアログ(window.confirm)経由"
+ },
+ {
+  "id": "U6",
+  "area": "画面(PROFILE)",
+  "title": "通知設定の変更がサーバーへ反映される",
+  "expect": "DBが更新",
+  "actual": "5分前→10分前→5分前へ反映、元に戻した",
+  "verdict": "PASS",
+  "note": ""
+ },
+ {
+  "id": "U7",
+  "area": "画面(PROFILE)",
+  "title": "未連携表示が正しい",
+  "expect": "Google/Outlook 未連携",
+  "actual": "未連携と表示",
+  "verdict": "PASS",
+  "note": ""
+ },
+ {
+  "id": "U8",
+  "area": "画面(SCHEDULE)",
+  "title": "未連携でも一覧/日/週/月が崩れない",
+  "expect": "エラー無し",
+  "actual": "4表示とも崩れなし、予定0件表示",
+  "verdict": "PASS",
+  "note": ""
+ },
+ {
+  "id": "U9",
+  "area": "画面(CHAT)",
+  "title": "チャット送受信・HTMLタグ入り入力が無害",
+  "expect": "返答が表示、タグは文字扱い",
+  "actual": "返答表示、注入なし",
+  "verdict": "PASS",
+  "note": ""
+ },
+ {
+  "id": "U10",
+  "area": "画面(CHAT)",
+  "title": "「今日のタスクは？」への回答",
+  "expect": "登録済みタスクを答える",
+  "actual": "『カレンダー未連携のため調べられません』と回答。タスク一覧を引くツールが無く、タスクを聞かれても答えられない",
+  "verdict": "NOTE",
+  "note": "要改善: list_tasksツール未実装。返答に内部用語『Part 1の設定手順』も混入"
+ },
+ {
+  "id": "U11",
+  "area": "画面(SCHEDULE)",
+  "title": "予定の編集・削除・即時削除ボタン・並び順",
+  "expect": "—",
+  "actual": "カレンダー未連携のため未検証",
+  "verdict": "SKIP",
+  "note": "再連携後に実施"
+ },
+ {
+  "id": "U12",
+  "area": "画面(CHAT)",
+  "title": "音声入力（マイク）",
+  "expect": "—",
+  "actual": "実機マイクが必要なため自動テスト不可",
+  "verdict": "SKIP",
+  "note": "手動確認項目"
+ }
+]

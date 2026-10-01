@@ -28,9 +28,34 @@ def decode_session_token(token: str) -> dict | None:
         return None
 
 
-def get_or_create_user(*, provider: str, provider_user_id: str, email: str, display_name: str | None) -> str:
+class IdentityLinkedToAnotherUserError(Exception):
+    """既にログイン中の自分とは別のuser_idに紐づいている外部アカウントを、
+    今のセッションへ重ねて連携しようとした場合に送出する。"""
+
+    def __init__(self, existing_user_id: str):
+        self.existing_user_id = existing_user_id
+        super().__init__("このアカウントは既に別の利用者として登録されています")
+
+
+def get_or_create_user(
+    *,
+    provider: str,
+    provider_user_id: str,
+    email: str,
+    display_name: str | None,
+    link_user_id: str | None = None,
+) -> str:
     """provider(google/outlook)のアカウントに紐づくuser_idを取得。
-    同じメールアドレスで別プロバイダを連携した場合も同一user_idに統合する（§10-4）。
+
+    - 既にその外部アカウント(provider_user_id)で連携済みなら、その時のuser_idをそのまま返す。
+      link_user_idが指定されていてそれと食い違う場合は、別人の/別セッションのアカウントに
+      既に連携済みという意味なのでIdentityLinkedToAnotherUserErrorを送出する
+    - link_user_id（ログイン中のセッションからの連携操作）があれば、メールアドレスの
+      一致に関わらずそのuser_idへ直接紐付ける。GoogleとOutlookで登録メールアドレスが
+      異なる人は珍しくなく、メール一致だけに頼ると同一人物を正しく統合できないため、
+      「今ログインしているアカウント」という明示的な情報を優先する（§10-4の実装手段）
+    - link_user_idが無い（＝未ログイン状態からの連携＝通常のログイン）場合のみ、
+      従来通りメールアドレス一致でユーザーを探す／無ければ新規作成する
     """
     sb = get_supabase()
 
@@ -43,16 +68,22 @@ def get_or_create_user(*, provider: str, provider_user_id: str, email: str, disp
         .execute()
     )
     if identity.data:
-        return identity.data[0]["user_id"]
+        existing_user_id = identity.data[0]["user_id"]
+        if link_user_id and link_user_id != existing_user_id:
+            raise IdentityLinkedToAnotherUserError(existing_user_id)
+        return existing_user_id
 
-    existing_by_email = sb.table("users").select("id").eq("email", email).limit(1).execute()
-    if existing_by_email.data:
-        user_id = existing_by_email.data[0]["id"]
+    if link_user_id:
+        user_id = link_user_id
     else:
-        user_id = str(uuid.uuid4())
-        sb.table("users").insert(
-            {"id": user_id, "email": email, "display_name": display_name}
-        ).execute()
+        existing_by_email = sb.table("users").select("id").eq("email", email).limit(1).execute()
+        if existing_by_email.data:
+            user_id = existing_by_email.data[0]["id"]
+        else:
+            user_id = str(uuid.uuid4())
+            sb.table("users").insert(
+                {"id": user_id, "email": email, "display_name": display_name}
+            ).execute()
 
     sb.table("user_identities").insert(
         {
@@ -99,6 +130,22 @@ def set_calendar_selection(
     ).eq("user_id", user_id).eq("provider", provider).execute()
 
 
+def parse_oauth_state(state: str | None) -> tuple[str, str | None]:
+    """OAuthコールバックのstateパラメータから (リダイレクト先パス, 連携先user_id) を取り出す。
+    stateは `"<target>"`（未ログイン状態からの通常ログイン）、または
+    `"<target>|<セッショントークン>"`（ログイン中に「もう一方のカレンダーも連携する」操作）の
+    いずれか。セッショントークンが有効であれば、その持ち主のuser_idへ連携する。
+    """
+    target, _, link_token = (state or "").partition("|")
+    target_path = "/onboarding" if target == "onboarding" else "/settings"
+    link_user_id = None
+    if link_token:
+        payload = decode_session_token(link_token)
+        if payload:
+            link_user_id = payload["sub"]
+    return target_path, link_user_id
+
+
 def get_oauth_tokens(*, user_id: str, provider: str) -> dict | None:
     sb = get_supabase()
     res = (
@@ -120,6 +167,20 @@ def delete_oauth_tokens(*, user_id: str, provider: str) -> None:
     """
     sb = get_supabase()
     sb.table("oauth_tokens").delete().eq("user_id", user_id).eq("provider", provider).execute()
+
+
+def unlink_provider(*, user_id: str, provider: str) -> None:
+    """ユーザー自身の意思による「連携を解除する」操作。トークンだけでなく
+    user_identitiesの紐付けごと外す。これを残したままだと、provider_user_idの
+    一致によって次回ログイン時に同じuser_idへ戻ってきてしまい、「別のアカウントとして
+    連携し直す」「別の人のアカウントへ付け替える」といったやり直しができない。
+    calendar_connection_stateも消し、意図的な解除を「連携が壊れた」の通知対象に
+    しないようにする。
+    """
+    sb = get_supabase()
+    sb.table("oauth_tokens").delete().eq("user_id", user_id).eq("provider", provider).execute()
+    sb.table("user_identities").delete().eq("user_id", user_id).eq("provider", provider).execute()
+    sb.table("calendar_connection_state").delete().eq("user_id", user_id).eq("provider", provider).execute()
 
 
 # ---------- 連携切れ通知（§UC-新: Chat/Home/Scheduleへの再連携アラート） ----------
