@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Literal, Optional
 
 from pydantic import BaseModel, field_validator
@@ -26,10 +27,38 @@ class Task(BaseModel):
     done: bool = False
 
 
+MAX_TASK_TITLE_LENGTH = 500
+
+
+def validate_task_title(v: Optional[str]) -> Optional[str]:
+    """空・空白のみの件名は拒否（画面は既定名で登録するが、APIの直叩きでは空件名が作れてしまっていた）。"""
+    if v is None:
+        return v
+    v = v.strip()
+    if not v:
+        raise ValueError("件名を入力してください")
+    if len(v) > MAX_TASK_TITLE_LENGTH:
+        raise ValueError(f"件名は{MAX_TASK_TITLE_LENGTH}文字以内にしてください")
+    return v
+
+
+def validate_task_due_date(v: Optional[str]) -> Optional[str]:
+    """期限は YYYY-MM-DD のみ受け付ける。不正な文字列がDBまで届くと500エラーになっていた。"""
+    if v is None or v == "":
+        return None
+    try:
+        return date.fromisoformat(v).isoformat()
+    except ValueError:
+        raise ValueError("期限は YYYY-MM-DD の形式で指定してください") from None
+
+
 class TaskCreate(BaseModel):
     title: str
     due_date: Optional[str] = None
     priority: Literal["low", "medium", "high"] = "medium"
+
+    _check_title = field_validator("title")(validate_task_title)
+    _check_due_date = field_validator("due_date")(validate_task_due_date)
 
 
 class FreeSlot(BaseModel):

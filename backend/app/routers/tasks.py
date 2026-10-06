@@ -1,12 +1,14 @@
+import uuid
 from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from ..database import get_supabase
 from ..dependencies import get_current_user
 from ..models import SessionUser
 from ..models import TaskCreate as TaskCreateModel
+from ..models import validate_task_due_date, validate_task_title
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 
@@ -49,9 +51,21 @@ class TaskUpdate(BaseModel):
     priority: Optional[Literal["low", "medium", "high"]] = None
     done: Optional[bool] = None
 
+    _check_title = field_validator("title")(validate_task_title)
+    _check_due_date = field_validator("due_date")(validate_task_due_date)
+
+
+def _require_task_id(task_id: str) -> str:
+    """UUIDでないIDがDBまで届くと500になるため、存在しないIDと同じ404で返す。"""
+    try:
+        return str(uuid.UUID(task_id))
+    except ValueError:
+        raise HTTPException(status_code=404, detail="タスクが見つかりません") from None
+
 
 @router.patch("/{task_id}")
 def update_task(task_id: str, body: TaskUpdate, user: SessionUser = Depends(get_current_user)):
+    task_id = _require_task_id(task_id)
     updates = {k: v for k, v in body.model_dump().items() if v is not None}
     if not updates:
         raise HTTPException(status_code=400, detail="更新内容がありません")
@@ -70,6 +84,7 @@ def update_task(task_id: str, body: TaskUpdate, user: SessionUser = Depends(get_
 
 @router.patch("/{task_id}/done")
 def complete_task(task_id: str, user: SessionUser = Depends(get_current_user)):
+    task_id = _require_task_id(task_id)
     sb = get_supabase()
     sb.table("tasks").update({"done": True}).eq("id", task_id).eq("user_id", user.user_id).execute()
     return {"ok": True}
@@ -77,5 +92,6 @@ def complete_task(task_id: str, user: SessionUser = Depends(get_current_user)):
 
 @router.delete("/{task_id}")
 def delete_task(task_id: str, user: SessionUser = Depends(get_current_user)):
+    task_id = _require_task_id(task_id)
     sb = get_supabase().table("tasks").delete().eq("id", task_id).eq("user_id", user.user_id).execute()
     return {"ok": True}

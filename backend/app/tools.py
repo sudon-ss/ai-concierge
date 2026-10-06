@@ -363,6 +363,25 @@ async def create_task(
     return res.data[0]
 
 
+async def list_tasks(
+    user_id: str, *, include_done: bool = False, due_within_days: int | None = None
+) -> dict:
+    """登録済みのタスクを返す（読み取りのみ）。「今日のタスクは？」「今週やることは？」
+    のような照会に答えるため。due_within_daysを指定すると、期限が今日から
+    その日数以内（期限切れを含む）のものに絞る。期限未設定のものは絞り込み時には含めない。
+    """
+    query = get_supabase().table("tasks").select("title, due_date, priority, done").eq("user_id", user_id)
+    if not include_done:
+        query = query.eq("done", False)
+    if due_within_days is not None:
+        limit_date = (datetime.now(JST) + timedelta(days=max(0, due_within_days))).date().isoformat()
+        query = query.lte("due_date", limit_date)
+    rows = query.execute().data
+    # 期限の近い順（期限未設定は最後）
+    rows.sort(key=lambda t: (t["due_date"] is None, t["due_date"] or ""))
+    return {"count": len(rows), "tasks": rows}
+
+
 RESCHEDULE_SEARCH_DAYS = 120
 
 
@@ -786,6 +805,24 @@ TOOLS = [
         },
     },
     {
+        "name": "list_tasks",
+        "description": (
+            "登録済みのタスク（期限付きのやること）を取得する。「今日のタスクは？」「今週やることは？」"
+            "「残っているタスクを教えて」といった照会に使う。読み取りのみなので確認は不要。"
+            "カレンダーの連携状況に関係なく利用できる。デフォルトでは未完了のみ。"
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "due_within_days": {
+                    "type": "integer",
+                    "description": "期限が今日からこの日数以内（期限切れを含む）のものに絞る。今日なら0、今週なら6程度。省略すると全件",
+                },
+                "include_done": {"type": "boolean", "description": "完了済みも含めるか（既定false）"},
+            },
+        },
+    },
+    {
         "name": "judge_memo_importance",
         "description": "メモ本文から重要度を判定する（持参物・締め切りなどのキーワードを検出）。",
         "input_schema": {
@@ -814,6 +851,8 @@ async def run_tool(name: str, user_id: str, tool_input: dict) -> dict:
         return await stage_event_deletion(user_id, event_id=tool_input["event_id"])
     if name == "create_task":
         return await create_task(user_id, **tool_input)
+    if name == "list_tasks":
+        return await list_tasks(user_id, **tool_input)
     if name == "judge_memo_importance":
         return judge_memo_importance(tool_input["text"])
     raise ValueError(f"unknown tool: {name}")
