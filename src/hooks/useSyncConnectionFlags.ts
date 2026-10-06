@@ -11,12 +11,16 @@ export function useSyncConnectionFlags() {
 
   useEffect(() => {
     if (!hasBackend() || !getSession()) return
-    getCalendarNotices()
-      .then((res) => {
-        if (!res.connected) return // 旧バージョンのサーバー応答では何もしない
-        updateCalendar('google', res.connected.google)
-        updateCalendar('outlook', res.connected.outlook)
-      })
-      .catch(() => {})
+    const sync = (retried: boolean) =>
+      getCalendarNotices()
+        .then((res) => {
+          if (!res.connected) return // 旧バージョンのサーバー応答では何もしない
+          updateCalendar('google', res.connected.google)
+          updateCalendar('outlook', res.connected.outlook)
+        })
+        .catch(() => {
+          if (!retried) setTimeout(() => sync(true), 2000) // 一時的な通信エラーなら1回だけ再取得
+        })
+    sync(false)
   }, [updateCalendar])
 }
