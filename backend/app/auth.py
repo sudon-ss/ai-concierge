@@ -222,7 +222,32 @@ def mark_connection_broken(*, user_id: str, provider: str) -> None:
         .limit(1)
         .execute()
     )
-    if not existing.data or not existing.data[0]["ever_connected"]:
+    if not existing.data:
+        # この機能の追加前に連携済みだったユーザーは記録行が無い。連携の紐付け
+        # (user_identities)が残っていれば「過去に連携していた」とみなして記録を作る
+        # （無いと、連携が切れても再連携の案内が一切出なかった）
+        identity = (
+            sb.table("user_identities")
+            .select("user_id")
+            .eq("user_id", user_id)
+            .eq("provider", provider)
+            .limit(1)
+            .execute()
+        )
+        if not identity.data:
+            return
+        sb.table("calendar_connection_state").upsert(
+            {
+                "user_id": user_id,
+                "provider": provider,
+                "ever_connected": True,
+                "broken_since": datetime.now(timezone.utc).isoformat(),
+                "dismissed": False,
+            },
+            on_conflict="user_id,provider",
+        ).execute()
+        return
+    if not existing.data[0]["ever_connected"]:
         return
     if existing.data[0]["broken_since"]:
         return  # 既に壊れている記録があれば最初に壊れた時刻を保持する
@@ -244,15 +269,37 @@ def get_connection_notices(user_id: str) -> dict[str, bool]:
     """provider -> 再連携を促す通知を出すべきか。DBのみを見る軽量な問い合わせで、
     外部カレンダーAPIへは一切アクセスしない（Chat/Home/Schedule表示のたびに呼ばれるため）。
     """
+    sb = get_supabase()
     rows = (
-        get_supabase()
-        .table("calendar_connection_state")
+        sb.table("calendar_connection_state")
         .select("provider, broken_since, dismissed")
         .eq("user_id", user_id)
         .execute()
         .data
     )
-    return {
-        r["provider"]: bool(r["broken_since"]) and not r["dismissed"]
-        for r in rows
-    }
+    notices = {r["provider"]: bool(r["broken_since"]) and not r["dismissed"] for r in rows}
+
+    # 記録行が無い既存ユーザー: 連携の紐付けは残っているのにトークンが無ければ
+    # 「連携が切れた」状態（トークン失効で自動削除された後など）として扱う
+    missing = [p for p in ("google", "outlook") if p not in notices]
+    if missing:
+        connected = get_connected_providers(user_id)
+        identities = (
+            sb.table("user_identities").select("provider").eq("user_id", user_id).execute().data
+        )
+        linked = {i["provider"] for i in identities}
+        for p in missing:
+            if p in linked and not connected.get(p):
+                notices[p] = True
+    return notices
+
+
+def get_connected_providers(user_id: str) -> dict[str, bool]:
+    """provider -> トークンが保存されているか（DBのみ。外部APIは呼ばない）。
+    画面側の「連携中」表示を、端末内の旗印ではなく実際の状態に合わせるために使う。
+    """
+    rows = (
+        get_supabase().table("oauth_tokens").select("provider").eq("user_id", user_id).execute().data
+    )
+    have = {r["provider"] for r in rows}
+    return {"google": "google" in have, "outlook": "outlook" in have}

@@ -425,6 +425,8 @@ export function unlinkCalendar(provider: 'google' | 'outlook') {
 export interface CalendarNotices {
   google: boolean
   outlook: boolean
+  /** 実際にトークンが保存されているか（端末内の「連携中」旗印ではなくサーバーの実態） */
+  connected: { google: boolean; outlook: boolean }
 }
 
 /** 連携が壊れている（要再連携の）プロバイダをDBのみの軽量な問い合わせで返す。
