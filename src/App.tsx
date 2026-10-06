@@ -12,6 +12,7 @@ import { ProfileProvider } from './hooks/useProfile'
 import { SettingsProvider, useSettings } from './hooks/useSettings'
 import { useReminders } from './hooks/useReminders'
 import { useWakeLock } from './hooks/useWakeLock'
+import { useSyncConnectionFlags } from './hooks/useSyncConnectionFlags'
 import { FlashOverlay } from './components/FlashOverlay'
 
 function Layout({ children }: { children: React.ReactNode }) {
@@ -34,6 +35,8 @@ function AppRoutes({ initialConnected }: { initialConnected?: string }) {
   const { current: reminderEvent, minutesUntil, dismiss } = useReminders()
   // リマインダー有効時は、通知を見逃さないよう画面の自動消灯を防ぐ
   useWakeLock(settings.notificationEnabled)
+  // 画面の「連携中」表示をサーバー側の実態に合わせる（失効で切れたまま残るのを防ぐ）
+  useSyncConnectionFlags()
 
   // OAuthコールバック自体はmain.tsxでReact起動前に同期処理済み（子コンポーネントの
   // useEffectがセッション未設定のまま先に発火するレースを避けるため）。

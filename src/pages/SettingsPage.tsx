@@ -152,7 +152,7 @@ export function SettingsPage() {
     }
     if (connected) {
       const label = provider === 'google' ? 'Google Calendar' : 'Outlook'
-      if (!window.confirm(`${label}との連携を解除してもよろしいでしょうか？\n（ログイン状態は維持されます。再連携すればまた使えます）`)) {
+      if (!window.confirm(`【確認】${label}との連携を解除します。\n\n解除すると、秘書がカレンダーを見られなくなり、ご予定の確認・登録ができなくなります。再連携するまで元に戻りません。\n\n本当に解除してよろしいですか？`)) {
         return
       }
       setUnlinking(provider)
@@ -210,7 +210,7 @@ export function SettingsPage() {
             className={clsx(
               'text-xs font-semibold rounded-md px-3 py-1.5 disabled:opacity-50',
               settings.calendarConnected.google
-                ? 'bg-gold-500 text-navy-900 hover:bg-gold-600'
+                ? 'text-navy-400 hover:text-red-600 underline underline-offset-2'
                 : 'btn-secondary',
             )}
           >
@@ -238,7 +238,7 @@ export function SettingsPage() {
             className={clsx(
               'text-xs font-semibold rounded-md px-3 py-1.5 disabled:opacity-50',
               settings.calendarConnected.outlook
-                ? 'bg-gold-500 text-navy-900 hover:bg-gold-600'
+                ? 'text-navy-400 hover:text-red-600 underline underline-offset-2'
                 : 'btn-secondary',
             )}
           >

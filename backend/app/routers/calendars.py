@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, field_validator
 
 from ..auth import (
+    get_connected_providers,
     get_connection_notices,
     get_oauth_tokens,
     set_calendar_selection,
@@ -27,6 +28,8 @@ def get_calendar_notices(user: SessionUser = Depends(get_current_user)):
     return {
         "google": notices.get("google", False),
         "outlook": notices.get("outlook", False),
+        # 実際にトークンが保存されているか。画面の「連携中」表示を実態に合わせるため
+        "connected": get_connected_providers(user.user_id),
     }
 
 

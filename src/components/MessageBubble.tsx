@@ -56,7 +56,8 @@ export function MessageBubble({
                 : 'bg-white text-navy-900 border border-gold-200/50 rounded-bl-sm',
             )}
           >
-            {message.content.text}
+            {/* AIがMarkdownの太字(**)を混ぜることがあり、そのまま出ると記号が見えてしまう */}
+            {isUser ? message.content.text : message.content.text.replace(/\*\*(.+?)\*\*/g, '$1')}
           </div>
         )}
         {message.content.type === 'briefing' && (
