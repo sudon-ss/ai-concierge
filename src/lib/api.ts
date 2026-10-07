@@ -62,31 +62,41 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
     clearSession()
     throw new Error('セッションが切れました。カレンダーを再連携してください')
   }
+  // 期限が近いセッションは、サーバーが新しいトークンをヘッダーで返す。差し替えて、
+  // 使い続けている間はログインが切れないようにする
+  const renewed = res.headers.get('X-Session-Token')
+  if (renewed) setSession(renewed)
   if (!res.ok) {
     throw new Error(`API error ${res.status}: ${await res.text()}`)
   }
   return res.json() as Promise<T>
 }
 
-/** 遷移先（onboarding/settings）に加え、既にログイン中なら現在のセッションを
- *  そのままstateへ乗せる。Google/Outlookで登録メールアドレスが違う人は多く、
- *  メール一致だけでは同一人物の統合ができないため、ログイン中に「もう一方の
- *  カレンダーも連携する」操作では、メールではなく今のセッション（=今のuser_id）に
- *  明示的に紐付ける。stateは `"<target>"` または `"<target>|<セッショントークン>"`。
+/** 遷移先（onboarding/settings）に加え、既にログイン中なら「追加連携用」の短命トークン（10分）を
+ *  stateへ乗せる。Google/Outlookで登録メールアドレスが違う人は多く、メール一致だけでは同一人物の
+ *  統合ができないため、ログイン中に「もう一方のカレンダーも連携する」操作では、メールではなく
+ *  今のアカウントへ明示的に紐付ける。stateはURLを往復しログに残るため、30日有効のセッション
+ *  トークンは載せない。stateは `"<target>"` または `"<target>|<追加連携用トークン>"`。
  */
-function buildAuthState(redirectTo?: 'onboarding'): string {
+async function buildAuthState(redirectTo?: 'onboarding'): Promise<string> {
   const target = redirectTo ?? 'settings'
-  const session = getSession()
-  return session ? `${target}|${session}` : target
+  if (!getSession()) return target
+  try {
+    const { token } = await apiFetch<{ token: string }>('/api/auth/link-token')
+    return `${target}|${token}`
+  } catch {
+    // 取得できなくても致命的ではない（従来どおりメールアドレスの一致で解決されるだけ）
+    return target
+  }
 }
 
 /** redirectTo='onboarding' を渡すと、認証後にオンボーディングのカレンダーステップへ戻る */
-export function googleLoginUrl(redirectTo?: 'onboarding'): string {
-  return `${API_BASE}/api/auth/google/login?state=${encodeURIComponent(buildAuthState(redirectTo))}`
+export async function googleLoginUrl(redirectTo?: 'onboarding'): Promise<string> {
+  return `${API_BASE}/api/auth/google/login?state=${encodeURIComponent(await buildAuthState(redirectTo))}`
 }
 
-export function outlookLoginUrl(redirectTo?: 'onboarding'): string {
-  return `${API_BASE}/api/auth/outlook/login?state=${encodeURIComponent(buildAuthState(redirectTo))}`
+export async function outlookLoginUrl(redirectTo?: 'onboarding'): Promise<string> {
+  return `${API_BASE}/api/auth/outlook/login?state=${encodeURIComponent(await buildAuthState(redirectTo))}`
 }
 
 export interface ChatApiResponse {

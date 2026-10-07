@@ -1,6 +1,7 @@
 ## 概要
 
 - 対象: ブラウザ版（PWA + FastAPI）。ローカルのバックエンドを本番と同じSupabaseに接続して実施。
+- **2026-10-08 の再実行**: セッション・追加連携用トークン（G章）を追加し、全項目PASS（失敗0）。
 - **2026-10-07 の再実行**: 使い捨てのダミーユーザーで実行するよう改め、実在ユーザー（連携済みカレンダー）には一切触れない。結果は **全項目PASS**（失敗0・要注意0）。
 - 再実行: `cd backend` → `.venv/Scripts/python.exe ../docs/qa/qa_nocal.py`（要ローカルバックエンド起動: `ENABLE_SCHEDULER=false uvicorn main:app --port 8001`）。
 

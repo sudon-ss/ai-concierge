@@ -167,7 +167,7 @@ export function SettingsPage() {
       }
       return
     }
-    window.location.href = provider === 'google' ? googleLoginUrl() : outlookLoginUrl()
+    window.location.href = provider === 'google' ? await googleLoginUrl() : await outlookLoginUrl()
   }
 
   return (
