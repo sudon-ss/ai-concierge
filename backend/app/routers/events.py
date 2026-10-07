@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from datetime import date, time
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, field_validator
 
 from ..calendar_service import dedupe_events, get_connected_adapters, normalize_instant
@@ -20,10 +20,14 @@ from ..tools import (
 router = APIRouter(prefix="/api/events", tags=["events"])
 
 MAX_TENTATIVE_SLOTS = 5
+# 予定一覧の取得期間の上限（極端な値で全期間を取りに行かせない）
+MAX_LIST_DAYS = 366
 
 
 @router.get("")
-async def list_events_endpoint(days: int = 30, user: SessionUser = Depends(get_current_user)):
+async def list_events_endpoint(
+    days: int = Query(30, ge=1, le=MAX_LIST_DAYS), user: SessionUser = Depends(get_current_user)
+):
     """カレンダー画面用: Phase 0のデモデータではなく、実際に連携済みのGoogle/Outlookの
     予定をそのまま一覧表示するためのエンドポイント。
     """

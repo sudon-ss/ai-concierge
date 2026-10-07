@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, Header, HTTPException
-from pydantic import BaseModel
+from typing import Annotated
+
+from pydantic import BaseModel, Field, field_validator
 
 from .. import push
 from ..config import settings
@@ -60,15 +62,28 @@ def send_test(user: SessionUser = Depends(get_current_user)):
 
 # ---------- 通知設定 ----------
 
+VALID_WEEKDAYS = {"mon", "tue", "wed", "thu", "fri", "sat", "sun"}
+
+
 class SettingsPatch(BaseModel):
+    """不正な値（25:99、マイナスの分数など）が保存されると、朝の通知が届かなくなったり、
+    リマインダー処理が壊れたりするため、保存前にここで弾く。"""
+
     briefing_enabled: bool | None = None
-    briefing_time: str | None = None
+    briefing_time: Annotated[str, Field(pattern=r"^([01]\d|2[0-3]):[0-5]\d$")] | None = None
     notification_enabled: bool | None = None
-    reminder_minutes: int | None = None
+    reminder_minutes: Annotated[int, Field(ge=0, le=1440)] | None = None
     blocking_enabled: bool | None = None
     blocked_weekdays: list[str] | None = None
-    blocked_start_hour: int | None = None
-    blocked_end_hour: int | None = None
+    blocked_start_hour: Annotated[int, Field(ge=0, le=23)] | None = None
+    blocked_end_hour: Annotated[int, Field(ge=0, le=23)] | None = None
+
+    @field_validator("blocked_weekdays")
+    @classmethod
+    def check_weekdays(cls, v: list[str] | None) -> list[str] | None:
+        if v is not None and not set(v) <= VALID_WEEKDAYS:
+            raise ValueError("曜日は mon〜sun で指定してください")
+        return v
 
 
 @router.get("/settings")

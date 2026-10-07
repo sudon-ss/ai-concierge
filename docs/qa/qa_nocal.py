@@ -11,8 +11,36 @@ from app.config import settings
 from app.database import get_supabase
 
 R = Recorder("nocal")
-OWNER = user_id_by_prefix("ae24ec44")
-OTHER = user_id_by_prefix("5441ee4b")  # 他人のトークンを装った越権アクセスの検証用（他人のデータは読み書きしない）
+# 実在のユーザー（本物のカレンダーが連携済み）には一切触れないよう、使い捨てのダミーユーザーで実行する。
+# 以前、実ユーザーで実行したところ「未連携のはず」という前提のテストが本物のGoogleカレンダーへ
+# 書き込み・設定変更をしてしまったため。ダミーはトークン無し＝常に未連携の状態になる。
+import atexit
+import uuid as _uuid
+
+
+def _make_dummy_user(tag: str) -> str:
+    uid = str(_uuid.uuid4())
+    get_supabase().table("users").insert({"id": uid, "email": f"qa-{tag}-{uid[:6]}@example.invalid"}).execute()
+    return uid
+
+
+OWNER = _make_dummy_user("owner")
+OTHER = _make_dummy_user("other")  # 他人のトークンを装った越権アクセスの検証用
+
+
+def _cleanup_dummy_users() -> None:
+    s = get_supabase()
+    for u in (OWNER, OTHER):
+        for t in ("tasks", "messages", "user_settings", "push_subscriptions", "sent_notifications",
+                  "calendar_connection_state", "oauth_tokens", "user_identities", "events"):
+            try:
+                s.table(t).delete().eq("user_id", u).execute()
+            except Exception:  # noqa: BLE001
+                pass
+        s.table("users").delete().eq("id", u).execute()
+
+
+atexit.register(_cleanup_dummy_users)
 c = client(OWNER)
 anon = client(None)
 
@@ -200,5 +228,30 @@ try:
 finally:
     n = purge_new_messages(OWNER, before_ids)
     R.add("E11", "チャット", "テストで増えた会話履歴だけを削除（元の履歴は保持）", "元の件数に戻る", f"{n}件を削除", PASS if message_ids(OWNER) == before_ids else FAIL)
+
+# ---------------- F. タスクの照会（list_tasks） ----------------
+import datetime as _dt
+
+today = _dt.datetime.now(_dt.timezone(_dt.timedelta(hours=9))).date()
+mk = lambda title, due: c.post("/api/tasks", json={"title": title, "due_date": due, "priority": "high"})
+o = chat(c, "今日のタスクは？")
+R.add("F1", "タスク照会", "タスクが1件も無いとき『今日のタスクは？』に正直に答える",
+      "list_tasksを呼び、『無い』と答える",
+      f"tools={[t.get('name') for t in o['tool_events']]} 返答={o['reply'][:100]!r}",
+      PASS if any(t.get("name") == "list_tasks" for t in o["tool_events"]) and o["error"] is None else FAIL)
+mk("【QA】今日期限の見積書", today.isoformat())
+mk("【QA】来月期限の報告書", (today + _dt.timedelta(days=40)).isoformat())
+o = chat(c, "今日のタスクは？")
+reply = o["reply"]
+R.add("F2", "タスク照会", "今日期限のタスクを答え、来月期限のタスクは含めない",
+      "『今日期限の見積書』を含み『来月期限の報告書』を含まない",
+      f"tools={[t.get('name') for t in o['tool_events']]} 返答={reply[:140]!r}",
+      PASS if ("見積書" in reply and "報告書" not in reply) else FAIL)
+o = chat(c, "残っているタスクを全部教えて")
+R.add("F3", "タスク照会", "全件を尋ねると両方答える", "見積書と報告書の両方を含む",
+      f"返答={o['reply'][:140]!r}", PASS if ("見積書" in o["reply"] and "報告書" in o["reply"]) else FAIL)
+for t in c.get("/api/tasks").json():
+    c.delete(f"/api/tasks/{t['id']}")
+purge_new_messages(OWNER, set())
 
 R.save()
