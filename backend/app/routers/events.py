@@ -1,5 +1,7 @@
 import asyncio
 from datetime import datetime, timedelta
+from datetime import date, time
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, field_validator
@@ -30,6 +32,34 @@ async def list_events_endpoint(days: int = 30, user: SessionUser = Depends(get_c
 
     adapters = await get_connected_adapters(user.user_id)
     events_lists = await asyncio.gather(*[a.list_events(now, time_max) for a in adapters.values()])
+    events = dedupe_events([ev for lst in events_lists for ev in lst])
+    events.sort(key=lambda e: normalize_instant(e["start"]))
+    return events
+
+
+JST = ZoneInfo("Asia/Tokyo")
+MAX_RANGE_DAYS = 93
+
+
+@router.get("/range")
+async def list_events_range_endpoint(start: str, end: str, user: SessionUser = Depends(get_current_user)):
+    """カレンダー画面の日／週／月表示用: 指定した期間（start〜end。両端の日を含む、YYYY-MM-DD・日本時間）
+    の予定を返す。/api/events は「今から先」しか返さないため、過去の日や1か月より先へ
+    移動すると空になっていた。
+    """
+    try:
+        d0 = date.fromisoformat(start)
+        d1 = date.fromisoformat(end)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="start / end は YYYY-MM-DD の形式で指定してください") from None
+    if d1 < d0 or (d1 - d0).days > MAX_RANGE_DAYS:
+        raise HTTPException(status_code=422, detail=f"期間は{MAX_RANGE_DAYS}日以内で、start <= end にしてください")
+
+    time_min = datetime.combine(d0, time.min, tzinfo=JST)
+    time_max = datetime.combine(d1 + timedelta(days=1), time.min, tzinfo=JST)
+
+    adapters = await get_connected_adapters(user.user_id)
+    events_lists = await asyncio.gather(*[a.list_events(time_min, time_max) for a in adapters.values()])
     events = dedupe_events([ev for lst in events_lists for ev in lst])
     events.sort(key=lambda e: normalize_instant(e["start"]))
     return events

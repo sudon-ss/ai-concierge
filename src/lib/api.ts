@@ -250,6 +250,14 @@ export function listEvents(days = 30): Promise<ApiEvent[]> {
   return apiFetch<ApiEvent[]>(`/api/events?days=${days}`)
 }
 
+const pad2 = (n: number) => String(n).padStart(2, '0')
+export const toDateStr = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+
+/** 日／週／月表示用: 指定期間（両端の日を含む）の予定を取得する。過去や1か月より先も見られる */
+export function listEventsRange(start: Date, end: Date): Promise<ApiEvent[]> {
+  return apiFetch<ApiEvent[]>(`/api/events/range?start=${toDateStr(start)}&end=${toDateStr(end)}`)
+}
+
 export function getBriefing(): Promise<BriefingResponse> {
   return apiFetch<BriefingResponse>('/api/briefing')
 }
