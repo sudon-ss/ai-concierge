@@ -14,6 +14,7 @@ import { useReminders } from './hooks/useReminders'
 import { useWakeLock } from './hooks/useWakeLock'
 import { useSyncConnectionFlags } from './hooks/useSyncConnectionFlags'
 import { FlashOverlay } from './components/FlashOverlay'
+import { OfflineBanner } from './components/OfflineBanner'
 
 function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation()
@@ -22,6 +23,7 @@ function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="h-dvh flex flex-col overflow-hidden">
       {!isOnboarding && <Header />}
+      {!isOnboarding && <OfflineBanner />}
       <main className="flex-1 flex flex-col min-h-0 overflow-hidden">{children}</main>
       {!isOnboarding && <BottomNav />}
     </div>
