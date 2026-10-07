@@ -16,12 +16,15 @@ export function useConnectionNotices() {
   const backendMode = hasBackend() && Boolean(getSession())
   const [notices, setNotices] = useState<CalendarNotices>(EMPTY)
 
-  const refresh = () => {
+  const refresh = (retried = false) => {
     if (!backendMode) return
     getCalendarNotices()
       // デプロイ切り替え中などでconnectedが未対応の応答が来ても落ちないようにする
       .then((res) => setNotices({ ...EMPTY, ...res, connected: res.connected ?? EMPTY.connected }))
-      .catch(() => {})
+      .catch(() => {
+        // 一時的な通信エラーで取得に失敗すると、再連携のバナーが出ないままになる。1回だけ再取得する
+        if (!retried) setTimeout(() => refresh(true), 2000)
+      })
   }
 
   useEffect(() => {
