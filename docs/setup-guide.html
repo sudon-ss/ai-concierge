@@ -1,3 +1,8 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>THE CONCIERGE 導入マニュアル</title>
 
 <style>
@@ -319,6 +324,8 @@
     section { break-inside: avoid-page; }
   }
 </style>
+</head>
+<body>
 
 <div class="wrap">
 
@@ -326,7 +333,7 @@
     <div class="wordmark">THE CONCIERGE</div>
     <div class="hairline"></div>
     <h1>はじめての方向け<br>セットアップ手引き</h1>
-    <p>Googleカレンダーとの連携、スマホからのワンタップ起動、お知らせの受け取り設定、iPhoneカレンダーをお使いの方の移行手順まで。所要時間はおよそ10分です。</p>
+    <p>Google・Outlookカレンダーとの連携、スマホからのワンタップ起動、お知らせの受け取り設定、iPhoneカレンダーをお使いの方の移行手順まで。所要時間はおよそ10分です。</p>
   </header>
 
   <div class="panel">
@@ -338,7 +345,7 @@
     </div>
 
     <ul class="checklist">
-      <li><span><strong>使用するGmailアドレスを管理者に伝えて、利用登録を済ませておく。</strong>現在このアプリはテスト運用中で、登録済みのアドレスからしか連携できません。未登録のままだとGoogleのログイン画面でブロックされます。</span></li>
+      <li><span><strong>GoogleカレンダーまたはOutlook（Microsoft 365）の、個人のアカウントをご用意ください。</strong>会社・組織が管理しているアカウントは、セキュリティ設定によって連携がブロックされることがあります。できるだけご自身の個人アカウントでお試しください。</span></li>
       <li><span>スマホで設定するのがおすすめです。パソコンでも同じ手順で使えます。</span></li>
       <li><span>iPhoneの方は<strong>Safari</strong>で開いてください。ホーム画面への追加がSafariから行えます。</span></li>
     </ul>
@@ -354,7 +361,7 @@
     <ul class="plain">
       <li>会話（テキスト・音声）でのご予定登録・変更・空き時間確認</li>
       <li>候補日の仮押さえ（返事待ちの間、他の予定で埋まらないよう自動でブロック）</li>
-      <li>1つのアカウント内で複数カレンダーを選び、同時登録・重複のない一覧表示</li>
+      <li><strong>Google・Outlookの両方を同時に連携</strong>し、1つのアカウント内で複数カレンダーを選び、同時登録・重複のない一覧表示</li>
       <li>タスク（期限付きのやること）の登録・管理</li>
       <li>毎朝のブリーフィングと、ご予定前のリマインダー（要設定・下記参照）</li>
     </ul>
@@ -362,27 +369,28 @@
     <h3>現時点でできないこと・制限があること</h3>
     <div class="caution">
       <span class="hd">機能の制限</span>
-      <p><strong>Outlook（Microsoft 365）は現在未対応です。</strong>設定作業中のため、いましばらくはGoogleカレンダーでご利用ください。</p>
       <p><strong>オフラインでは使えません。</strong>通信が必要です。</p>
       <p><strong>音声入力は対応ブラウザのみです。</strong>iPhoneはSafari、AndroidはChromeでお使いください。それ以外のブラウザでは音声入力が使えないことがあります（テキスト入力は問題なく使えます）。</p>
       <p><strong>iPhoneでホーム画面に追加したアイコンから開いた場合、音声入力は使えません。</strong>これはiOS自体の制約によるもので、アプリ側では回避できません。音声入力を使いたい場合は、ホーム画面のアイコンではなく<strong>Safariアプリで直接開いて</strong>ご利用ください（テキスト入力はホーム画面のアイコンからでも問題なく使えます）。</p>
       <p><strong>リマインダー・朝のブリーフィングは、設定をしないと届きません。</strong>既定ではオフです。設定方法はPart 2でご案内します。</p>
     </div>
 
-    <h3>テスト運用にあたってのご留意事項</h3>
+    <h3>ご利用にあたってのご留意事項</h3>
     <div class="caution">
       <span class="hd">運用上の注意</span>
-      <p><strong>Googleの審査がまだ完了していません。</strong>そのため連携時に「このアプリはGoogleで確認されていません」という警告画面が表示されます（Part 1で通過方法をご案内します）。開発中の社内アプリとして想定どおりの表示で、不具合ではありません。</p>
-      <p><strong>7日間操作がないと、Googleとの連携が自動的に切れることがあります。</strong>審査完了前の状態に起因する制限です。切れた場合は設定画面から再度「連携する」を押していただくだけで復旧します。なるべく定期的にお使いいただけると発生しにくくなります。</p>
       <p><strong>開発中のため、不具合や使いにくい点が見つかることがあります。</strong>お気づきの点は、別途ご案内するフィードバックシートにご記入ください。改善に反映していきます。</p>
+    </div>
+    <div class="note">
+      <span class="hd">GoogleもOutlookも、連携時に「未確認のアプリ」の警告が出ます</span>
+      <p>現在、Google・Microsoftの正式な審査はまだ受けていません。そのため連携の途中で警告画面が表示されます。Part 1の手順で通過してください。開発中のアプリとして想定どおりの表示で、不具合ではありません。</p>
     </div>
   </section>
 
   <!-- ============ 1 ============ -->
   <section>
     <div class="eyebrow">Part 1</div>
-    <h2>Googleカレンダーをつなぐ</h2>
-    <p class="lede">アプリに「あなたのカレンダーを読み書きしてよい」と許可を与える作業です。パスワードをアプリに預けることはありません。</p>
+    <h2>カレンダーをつなぐ<br>（Google・Outlook）</h2>
+    <p class="lede">アプリに「あなたのカレンダーを読み書きしてよい」と許可を与える作業です。パスワードをアプリに預けることはありません。どちらか一方だけでも、両方つないでも構いません。</p>
 
     <ol class="steps">
       <li>
@@ -393,29 +401,33 @@
       </li>
       <li>
         <div class="body">
-          <strong>お立場を選ぶ（STEP 1/3）</strong>
+          <strong>お立場を選ぶ</strong>
           <p><span class="ui">社長</span><span class="ui">役員</span><span class="ui">CFO</span>から選びます。秘書があなたをどう呼ぶかが変わるだけなので、深く悩まず選んで<span class="ui">次へ</span>を押してください。あとから設定画面で変更できます。</p>
         </div>
       </li>
       <li>
         <div class="body">
-          <strong>「カレンダーをご連携」でGoogleの<span class="ui">連携する</span>を押す（STEP 2/3）</strong>
-          <p>Googleのログイン画面に切り替わります。<strong>ここで1つ以上つながないと次へ進めません。</strong></p>
+          <strong>「カレンダーをご連携」で使う方の<span class="ui">連携する</span>を押す</strong>
+          <p>Google・Outlookそれぞれにボタンがあります。<strong>ここで1つ以上つながないと次へ進めません。</strong>どちらを押すかで、以下1-A／1-Bに分かれます。</p>
         </div>
       </li>
+    </ol>
+
+    <h3 id="part1a">1-A　Googleカレンダーの場合</h3>
+    <ol class="steps">
       <li>
         <div class="body">
           <strong>使いたいGoogleアカウントを選ぶ</strong>
-          <p>複数のアカウントでログインしている場合は、<strong>管理者に伝えたアドレス</strong>を選んでください。別のアドレスを選ぶとブロックされます。</p>
+          <p>複数のアカウントでログインしている場合は、<strong>ご自身の個人アカウント</strong>を選んでください（会社・組織管理のアカウントはブロックされることがあります）。</p>
         </div>
       </li>
       <li>
         <div class="body">
           <strong>「このアプリはGoogleで確認されていません」を通過する</strong>
-          <p>審査前の社内テストアプリのため、警告画面が出ます。画面左下の<span class="ui">詳細</span>を押し、下に出てくる<span class="ui">（安全ではないページ）に移動</span>を押してください。</p>
+          <p>警告画面が出ます。画面左下の<span class="ui">詳細</span>を押し、下に出てくる<span class="ui">（安全ではないページ）に移動</span>を押してください。</p>
           <div class="caution">
             <span class="hd">この警告について</span>
-            <p>これはGoogleの審査をまだ受けていない開発中アプリすべてに出る表示で、不具合ではありません。今回は自分たちで作ったアプリだと分かっているため進んで問題ありません。一般公開時には審査を通すのでこの画面は出なくなります。</p>
+            <p>Googleの正式な審査をまだ受けていないアプリすべてに出る表示で、不具合ではありません。自分たちで作ったアプリだと分かっているため進んで問題ありません。</p>
           </div>
         </div>
       </li>
@@ -425,10 +437,45 @@
           <p>「予定の表示・編集」の許可を求められます。チェックを入れて<span class="ui">続行</span>を押すと、アプリに戻ります。</p>
         </div>
       </li>
+    </ol>
+
+    <h3 id="part1b">1-B　Outlook（Microsoft 365）の場合</h3>
+    <ol class="steps">
+      <li>
+        <div class="body">
+          <strong>使いたいMicrosoftアカウントでログインする</strong>
+          <p><strong>個人のMicrosoftアカウント</strong>（Outlook.com・Hotmail等）でお試しください。会社・組織が管理するアカウントは、管理者の設定によって連携がブロックされることがあります。</p>
+        </div>
+      </li>
+      <li>
+        <div class="body">
+          <strong>「確認されていないアプリ」の警告を通過する</strong>
+          <p>Outlook側はまだMicrosoftの審査・公開手続き中のため、警告画面が出ることがあります。内容を確認のうえ<span class="ui">続行</span>（または詳細を開いて進める）を押してください。</p>
+          <div class="caution">
+            <span class="hd">この警告について</span>
+            <p>これは審査前の開発中アプリに出る一般的な表示で、不具合ではありません。自分たちで作ったアプリだと分かっているため進んで問題ありません。</p>
+          </div>
+        </div>
+      </li>
+      <li>
+        <div class="body">
+          <strong>カレンダーへのアクセスを許可する</strong>
+          <p>予定の読み書きの許可を求められます。許可するとアプリに戻ります。</p>
+        </div>
+      </li>
+    </ol>
+
+    <div class="note">
+      <span class="hd">両方のカレンダーを使いたい方へ</span>
+      <p>先にどちらか一方を連携してログインした状態のまま、設定画面（PROFILE）でもう一方の<span class="ui">連携する</span>を押せば、<strong>同じアカウントにまとめて</strong>追加されます。Google側とOutlook側でメールアドレスが違っても問題ありません。</p>
+      <p>もし「このアカウントは既に別の利用者として登録されています」と表示された場合は、以前そのアカウントだけで単独連携したことがある状態です。ご自身では直せないので、開発チームへご連絡ください（アカウントのひも付けを直す作業を行います）。</p>
+    </div>
+
+    <ol class="steps">
       <li>
         <div class="body">
           <strong>「参照」と「登録先」のカレンダーを選ぶ</strong>
-          <p>アプリに戻ると、カレンダー連携の画面に戻ってきます。カレンダーを複数お持ちの方は、ここで選択欄が出ます。</p>
+          <p>アプリに戻ると、カレンダー連携の画面に戻ってきます。カレンダーを複数お持ちの方は、ここで選択欄が出ます（Google・Outlookそれぞれで選べます）。</p>
           <div class="note">
             <span class="hd">2つの設定の違い</span>
             <p><strong>参照</strong>＝空き時間を探すときに「予定が入っている」とみなすカレンダー。仕事用と個人用の両方を選んでおくと、プライベートの予定に会議を入れられずに済みます。</p>
@@ -439,7 +486,7 @@
       </li>
       <li>
         <div class="body">
-          <strong>お知らせの時間を決めて完了（STEP 3/3）</strong>
+          <strong>お知らせの時間を決めて完了</strong>
           <p>朝のブリーフィングの時刻と、予定の何分前に知らせるかを選び、<span class="ui">利用を開始する</span>を押せば設定完了です。</p>
         </div>
       </li>
@@ -448,11 +495,11 @@
     <h3>うまくいかないとき</h3>
     <div class="note">
       <span class="hd">エラーと出たら、まずもう一度</span>
-      <p>Googleのログイン途中で「エラーが発生しました」と出ることがあります。多くは一時的なもので、もう一度<span class="ui">連携する</span>からやり直すと通ります。シークレットウィンドウ／プライベートブラウズでは失敗しやすいので、通常のウィンドウでお試しください。</p>
+      <p>ログイン途中で「エラーが発生しました」と出ることがあります。多くは一時的なもので、もう一度<span class="ui">連携する</span>からやり直すと通ります。シークレットウィンドウ／プライベートブラウズでは失敗しやすいので、通常のウィンドウでお試しください。</p>
     </div>
     <div class="caution">
       <span class="hd">「アクセスをブロックしました」と出る場合</span>
-      <p>そのGoogleアドレスがまだ利用登録されていません。使いたいアドレスを管理者に伝えて、登録後にもう一度お試しください。</p>
+      <p>会社・組織が管理しているアカウントで試している可能性があります。個人のアカウントに切り替えてお試しください。それでも解消しない場合は開発チームへご連絡ください。</p>
     </div>
   </section>
 
@@ -546,6 +593,10 @@
     <div class="eyebrow">Part 3</div>
     <h2>iPhoneのカレンダーを<br>使っている方へ</h2>
     <p class="lede">この秘書はGoogleカレンダーとOutlookに対応しています。iPhone標準の「カレンダー」アプリでiCloudに予定を入れている方は、Googleカレンダー側でも予定が見えるようにする必要があります。方法は3つあります。</p>
+    <div class="note">
+      <span class="hd">普段からOutlookをお使いの方へ</span>
+      <p>Part 1-Bの手順でOutlookを直接連携すれば、この章の作業は不要です。iCloudの予定をOutlookへ移す機能はありませんので、その場合のみ以下をご参照ください。</p>
+    </div>
 
     <div class="tablewrap">
       <table>
@@ -721,41 +772,13 @@
     <p class="lede">新しく使う方が増えたときの作業です。ご利用される方はこの章を読み飛ばしていただいて構いません。</p>
 
     <div class="note">
-      <span class="hd">アプリ側の作業は不要です</span>
-      <p>追加した方がご自身のGoogleアカウントで連携すれば、その方専用のデータ領域が自動で作られます。必要なのは、Googleの利用許可リストに1名を加えることだけです。</p>
+      <span class="hd">基本的にアプリ側の作業は不要です</span>
+      <p>追加した方がご自身のGoogleまたはOutlookアカウントで連携すれば、その方専用のデータ領域が自動で作られます。Googleは公開済みのため、事前のユーザー登録は不要になりました。Outlook（個人アカウント）も同様に、事前登録なしでそのまま連携できます。URLとこの手引きを本人に渡すだけで始められます。</p>
     </div>
 
-    <ol class="steps">
-      <li>
-        <div class="body">
-          <strong>Google Cloud Console を開く</strong>
-          <p><a href="https://console.cloud.google.com/">console.cloud.google.com</a> を開き、画面上部でこのアプリのプロジェクトが選ばれているかご確認ください。</p>
-        </div>
-      </li>
-      <li>
-        <div class="body">
-          <strong>「Google Auth Platform」→「対象」を開く</strong>
-          <p>以前の画面では<span class="path">APIとサービス → OAuth同意画面</span>です。表示が違う場合は、上部の検索窓に「OAuth」と入れると辿り着けます。</p>
-        </div>
-      </li>
-      <li>
-        <div class="body">
-          <strong>「テストユーザー」の<span class="ui">＋ ユーザーを追加</span>を押す</strong>
-          <p>追加したい方の<strong>Gmailアドレス</strong>を入力して保存します。反映は即時で、審査などの待ち時間はありません。</p>
-        </div>
-      </li>
-      <li>
-        <div class="body">
-          <strong>本人にURLとこの手引きを渡す</strong>
-          <p>あとはこの手引きのとおりに進めていただければ使い始められます。</p>
-        </div>
-      </li>
-    </ol>
-
     <div class="caution">
-      <span class="hd">よくある行き違い</span>
-      <p><strong>登録したアドレスと、本人がログインで選ぶアドレスは一致している必要があります。</strong>仕事用と個人用の2つのGoogleアカウントをお持ちの方には、どちらで使うか事前にご確認ください。違うアドレスを選ぶと「アクセスをブロックしました」と表示されます。</p>
-      <p>テストユーザーは100人まで登録できます。現在の人数であれば余裕があります。</p>
+      <span class="hd">会社・組織のアカウントを使う方への案内</span>
+      <p>会社が管理しているGoogle Workspace／Microsoft 365のアカウントは、組織側のセキュリティ設定によって外部アプリとの連携がブロックされることがあります（管理者の許可が必要になる場合、そもそも許可されない場合の両方があり得ます）。できるだけ<strong>個人のGoogle／Microsoftアカウント</strong>でご案内ください。ブロックされた場合、アプリ側では解除できません。</p>
     </div>
   </section>
 
@@ -791,13 +814,25 @@
       <details open>
         <summary>Outlookも使えますか？</summary>
         <div>
-          <p>アプリ側の対応は済んでいますが、現在Microsoft側の設定作業中です。使えるようになり次第お知らせします。それまではGoogleカレンダーでお使いください。</p>
+          <p>使えます。Part 1-Bの手順で連携してください。GoogleとOutlook、両方を同時につないでおくこともできます。</p>
+        </div>
+      </details>
+      <details open>
+        <summary>会社のGoogle・Outlookアカウントでも使えますか？</summary>
+        <div>
+          <p>組織のセキュリティ設定によってはブロックされることがあります。できるだけご自身の個人アカウントでお試しください。</p>
+        </div>
+      </details>
+      <details open>
+        <summary>Googleで連携したあとOutlookを連携したら、Googleが使えなくなった（または逆）</summary>
+        <div>
+          <p>起きません。設定画面で<strong>ログインしたまま</strong>もう一方の<span class="ui">連携する</span>を押していただければ、両方とも同じアカウントで使い続けられます。もし一方の「解除」を確認する画面が出た場合は、押し間違いの可能性がありますので<span class="ui">キャンセル</span>し、連携したい方の行の<span class="ui">連携する</span>ボタンを改めてお探しください。</p>
         </div>
       </details>
       <details open>
         <summary>連携をやめたいときは？</summary>
         <div>
-          <p>アプリの<span class="ui">PROFILE</span>（設定）画面から<span class="ui">解除</span>を押してください。あわせてGoogleアカウント側からも取り消したい場合は、Googleアカウントの「セキュリティ」→「サードパーティ製アプリとの連携」から解除できます。</p>
+          <p>アプリの<span class="ui">PROFILE</span>（設定）画面から<span class="ui">解除</span>を押してください。ログイン状態は維持されるので、もう一方のカレンダーは使い続けられます。あわせてGoogle／Microsoftアカウント側からも取り消したい場合は、各アカウントの「セキュリティ」設定にある連携アプリの一覧から解除できます。</p>
         </div>
       </details>
       <details open>
@@ -815,3 +850,5 @@
   </footer>
 
 </div>
+</body>
+</html>
