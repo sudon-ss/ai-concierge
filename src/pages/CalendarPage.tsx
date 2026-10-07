@@ -8,7 +8,15 @@ import { EventEditModal } from '../components/EventEditModal'
 import { CalendarGridView, type GridViewMode } from '../components/CalendarGridView'
 import { ConnectionNoticeBanner } from '../components/ConnectionNoticeBanner'
 import type { CalendarEvent } from '../types'
-import { deleteEventApi, getSession, hasBackend, listEvents, updateEventApi } from '../lib/api'
+import {
+  deleteEventApi,
+  getSession,
+  hasBackend,
+  listEvents,
+  listEventsRange,
+  toDateStr,
+  updateEventApi,
+} from '../lib/api'
 
 type ViewMode = 'list' | GridViewMode
 
@@ -23,6 +31,32 @@ const groupByDay = (iso: string) =>
 
 const fmtTime = (iso: string) =>
   new Date(iso).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
+
+/** 日／週／月表示で取得する期間。表示中の月の前後8日ぶんを含める（月表示の6週間・週をまたぐ表示をカバー）。
+ * この範囲内の移動（前へ／次へ）では再取得しない。 */
+const windowFor = (d: Date) => {
+  const start = new Date(d.getFullYear(), d.getMonth(), 1)
+  start.setDate(start.getDate() - 8)
+  const end = new Date(d.getFullYear(), d.getMonth() + 1, 0)
+  end.setDate(end.getDate() + 8)
+  return { start, end }
+}
+
+const toCalendarEvent = (e: {
+  id: string
+  title: string
+  start: string
+  end: string
+  source: CalendarEvent['source']
+  location?: string | null
+}): CalendarEvent => ({
+  id: e.id,
+  title: e.title,
+  start: e.start,
+  end: e.end,
+  source: e.source,
+  location: e.location ?? undefined,
+})
 
 const newDraftEvent = (): CalendarEvent => {
   const start = new Date()
@@ -53,24 +87,19 @@ export function CalendarPage() {
   const [loading, setLoading] = useState(backendMode)
   const [loadError, setLoadError] = useState<string | null>(null)
 
+  // 日／週／月表示用: 表示中の期間（過去・先の月を含む）の予定。一覧表示用の「今から30日」とは別に持つ
+  const [rangeEvents, setRangeEvents] = useState<CalendarEvent[] | null>(null)
+  const [rangeKey, setRangeKey] = useState('')
+  const [rangeLoading, setRangeLoading] = useState(false)
+
   const loadReal = () => {
     setLoading(true)
     setLoadError(null)
     listEvents()
-      .then((apiEvents) =>
-        setRealEvents(
-          apiEvents.map((e) => ({
-            id: e.id,
-            title: e.title,
-            start: e.start,
-            end: e.end,
-            source: e.source,
-            location: e.location,
-          })),
-        ),
-      )
+      .then((apiEvents) => setRealEvents(apiEvents.map(toCalendarEvent)))
       .catch(() => setLoadError('恐れ入ります、ご予定の取得に失敗いたしました。'))
       .finally(() => setLoading(false))
+    setRangeKey('') // 登録・編集・削除のあとは、表示期間の予定も取り直す
   }
 
   useEffect(() => {
@@ -78,7 +107,34 @@ export function CalendarPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [backendMode])
 
+  // 日／週／月表示では、表示している日付を含む期間の予定を取得する（範囲内の移動では再取得しない）
+  useEffect(() => {
+    if (!backendMode || viewMode === 'list') return
+    const { start, end } = windowFor(gridDate)
+    const key = `${toDateStr(start)}_${toDateStr(end)}`
+    if (key === rangeKey) return
+    let cancelled = false
+    setRangeLoading(true)
+    listEventsRange(start, end)
+      .then((apiEvents) => {
+        if (cancelled) return
+        setRangeEvents(apiEvents.map(toCalendarEvent))
+        setRangeKey(key)
+        setLoadError(null)
+      })
+      .catch(() => {
+        if (!cancelled) setLoadError('恐れ入ります、ご予定の取得に失敗いたしました。')
+      })
+      .finally(() => {
+        if (!cancelled) setRangeLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [backendMode, viewMode, gridDate, rangeKey])
+
   const events = backendMode ? (realEvents ?? []) : demoEvents
+  const gridEvents = backendMode ? (rangeEvents ?? []) : demoEvents
 
   // APIの返却順・追加順に依存せず、常に開始時刻の昇順で表示する。GoogleはUTCオフセット付き、
   // Outlookはオフセットなしの日時文字列を返すことがあり、文字列のまま比較すると正しい順序に
@@ -258,7 +314,8 @@ export function CalendarPage() {
         <CalendarGridView
           mode={viewMode}
           currentDate={gridDate}
-          events={events}
+          loading={rangeLoading}
+          events={gridEvents}
           onDateChange={setGridDate}
           onEventClick={openEdit}
           onDayClick={(d) => {

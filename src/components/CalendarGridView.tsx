@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
 import clsx from 'clsx'
 import type { CalendarEvent } from '../types'
 
@@ -9,6 +9,8 @@ interface Props {
   mode: GridViewMode
   currentDate: Date
   events: CalendarEvent[]
+  /** 表示期間の予定を取得中（過去・先の月へ移動した直後など） */
+  loading?: boolean
   onDateChange: (date: Date) => void
   onEventClick: (event: CalendarEvent) => void
   /** 月表示で日付セルをタップした時（日表示へ遷移させるのに使う） */
@@ -258,7 +260,7 @@ function HourGrid({
   )
 }
 
-export function CalendarGridView({ mode, currentDate, events, onDateChange, onEventClick, onDayClick }: Props) {
+export function CalendarGridView({ mode, currentDate, events, loading, onDateChange, onEventClick, onDayClick }: Props) {
   const eventsOn = (date: Date) => events.filter((e) => sameDay(new Date(e.start), date))
 
   const goPrev = () => {
@@ -272,6 +274,24 @@ export function CalendarGridView({ mode, currentDate, events, onDateChange, onEv
     else onDateChange(addMonths(currentDate, 1))
   }
   const goToday = () => onDateChange(new Date())
+
+  // 右上の日付をタップすると、端末のカレンダーが開き、選んだ日へ直接ジャンプする。
+  // 日表示はその日、週表示はその日を含む週、月表示はその日を含む月へ移動する（左右ボタンの連打が不要）
+  const jumpInputRef = useRef<HTMLInputElement>(null)
+  const toInputValue = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  const onJump = (value: string) => {
+    if (!value) return
+    const [y, m, d] = value.split('-').map(Number)
+    onDateChange(new Date(y, m - 1, d))
+  }
+  const openPicker = () => {
+    try {
+      jumpInputRef.current?.showPicker()
+    } catch {
+      jumpInputRef.current?.focus() // showPickerに未対応の環境では、入力欄へフォーカスするだけにとどめる
+    }
+  }
 
   const headerLabel = useMemo(() => {
     if (mode === 'day') {
@@ -316,8 +336,24 @@ export function CalendarGridView({ mode, currentDate, events, onDateChange, onEv
             今日
           </button>
         </div>
-        <p className="text-sm font-semibold text-navy-800 serif">{headerLabel}</p>
+        <label
+          className="relative inline-flex items-center gap-1 cursor-pointer rounded-md px-2 py-1 hover:bg-navy-50 border border-transparent hover:border-navy-200"
+          title="日付を選んで移動"
+        >
+          <span className="text-sm font-semibold text-navy-800 serif">{headerLabel}</span>
+          <CalendarDays size={14} className="text-gold-600" />
+          <input
+            ref={jumpInputRef}
+            type="date"
+            value={toInputValue(currentDate)}
+            onChange={(e) => onJump(e.target.value)}
+            onClick={openPicker}
+            aria-label="日付を選んで移動"
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+          />
+        </label>
       </div>
+      {loading && <p className="text-[11px] text-navy-400 text-right -mt-1">ご予定を読み込み中…</p>}
 
       {mode === 'day' && (
         <HourGrid
