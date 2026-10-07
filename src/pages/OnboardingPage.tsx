@@ -53,14 +53,14 @@ export function OnboardingPage({ initialConnected }: { initialConnected?: string
     navigate('/', { replace: true })
   }
 
-  const handleConnectCalendar = (provider: 'google' | 'outlook') => {
+  const handleConnectCalendar = async (provider: 'google' | 'outlook') => {
     if (!backendConnected) {
       // バックエンド未設定（VITE_API_BASE_URL未設定）時はデモ用のローカルトグルのまま
       updateCalendar(provider, true)
       return
     }
     window.location.href =
-      provider === 'google' ? googleLoginUrl('onboarding') : outlookLoginUrl('onboarding')
+      provider === 'google' ? await googleLoginUrl('onboarding') : await outlookLoginUrl('onboarding')
   }
 
   return (

@@ -9,6 +9,7 @@ from app import scheduler
 from app.config import settings
 from app.routers import (
     auth_google,
+    auth_link,
     auth_outlook,
     briefing,
     calendars,
@@ -40,10 +41,13 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # 期限が近いセッションを自動更新するため、ブラウザから新トークンのヘッダーを読めるようにする
+    expose_headers=["X-Session-Token"],
 )
 
 app.include_router(auth_google.router)
 app.include_router(auth_outlook.router)
+app.include_router(auth_link.router)
 app.include_router(chat.router)
 app.include_router(calendars.router)
 app.include_router(events.router)

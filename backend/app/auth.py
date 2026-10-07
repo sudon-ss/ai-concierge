@@ -9,6 +9,13 @@ from .database import get_supabase
 
 ALGORITHM = "HS256"
 SESSION_TTL_SECONDS = 60 * 60 * 24 * 30  # 30日
+# 使い続けている間は切れないよう、発行から7日以上たったセッションは、APIを呼ぶたびに
+# 新しいトークン（また30日有効）をレスポンスヘッダーで返して差し替える
+SESSION_RENEW_AFTER_SECONDS = 60 * 60 * 24 * 7
+# OAuthのstateに載せる「追加連携用」の短命トークン。stateはURLを往復し、Renderのアクセスログや
+# ブラウザ履歴にそのまま残るため、30日有効のセッショントークンは載せず、10分だけ有効な
+# この用途専用のトークンを使う（漏れても10分で失効する）
+LINK_TTL_SECONDS = 60 * 10
 
 
 def create_session_token(user_id: str, email: str) -> str:
@@ -23,9 +30,30 @@ def create_session_token(user_id: str, email: str) -> str:
 
 def decode_session_token(token: str) -> dict | None:
     try:
-        return jwt.decode(token, settings.session_secret, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, settings.session_secret, algorithms=[ALGORITHM])
     except JWTError:
         return None
+    if payload.get("purpose"):
+        return None  # 追加連携用トークンなど、セッション以外の用途のトークンは受け付けない
+    return payload
+
+
+def create_link_token(user_id: str) -> str:
+    """ログイン中のユーザーが、別プロバイダのカレンダーを自分のアカウントへ追加連携する際の
+    短命トークン（10分）。purposeで用途を区別し、セッショントークンとして誤用されないようにする。"""
+    now = int(time.time())
+    payload = {"sub": user_id, "purpose": "link", "iat": now, "exp": now + LINK_TTL_SECONDS}
+    return jwt.encode(payload, settings.session_secret, algorithm=ALGORITHM)
+
+
+def decode_link_token(token: str) -> str | None:
+    try:
+        payload = jwt.decode(token, settings.session_secret, algorithms=[ALGORITHM])
+    except JWTError:
+        return None
+    if payload.get("purpose") != "link":
+        return None
+    return payload.get("sub")
 
 
 class IdentityLinkedToAnotherUserError(Exception):
@@ -133,16 +161,13 @@ def set_calendar_selection(
 def parse_oauth_state(state: str | None) -> tuple[str, str | None]:
     """OAuthコールバックのstateパラメータから (リダイレクト先パス, 連携先user_id) を取り出す。
     stateは `"<target>"`（未ログイン状態からの通常ログイン）、または
-    `"<target>|<セッショントークン>"`（ログイン中に「もう一方のカレンダーも連携する」操作）の
-    いずれか。セッショントークンが有効であれば、その持ち主のuser_idへ連携する。
+    `"<target>|<追加連携用トークン>"`（ログイン中に「もう一方のカレンダーも連携する」操作）の
+    いずれか。追加連携用トークン（10分有効）が有効であれば、その持ち主のuser_idへ連携する。
+    30日有効のセッショントークンはここでは受け付けない（URL・ログに残るため）。
     """
     target, _, link_token = (state or "").partition("|")
     target_path = "/onboarding" if target == "onboarding" else "/settings"
-    link_user_id = None
-    if link_token:
-        payload = decode_session_token(link_token)
-        if payload:
-            link_user_id = payload["sub"]
+    link_user_id = decode_link_token(link_token) if link_token else None
     return target_path, link_user_id
 
 

@@ -254,4 +254,43 @@ for t in c.get("/api/tasks").json():
     c.delete(f"/api/tasks/{t['id']}")
 purge_new_messages(OWNER, set())
 
+# ---------------- G. セッション・追加連携用トークン ----------------
+from jose import jwt as _jwt
+from app.auth import create_link_token, create_session_token, decode_link_token, decode_session_token, parse_oauth_state
+
+
+def _aged_token(days_ago):
+    now = int(time.time())
+    return _jwt.encode({"sub": OWNER, "email": "qa@example.invalid", "iat": now - days_ago * 86400, "exp": now + (30 - days_ago) * 86400},
+                       settings.session_secret, algorithm="HS256")
+
+
+sess_tok = create_session_token(OWNER, "qa@example.invalid")
+link_tok = create_link_token(OWNER)
+R.check("G1", "トークン", "追加連携用トークンは10分有効で、セッションとは区別される", "リンク用として解釈でき、セッションとしては使えない",
+        f"link→{decode_link_token(link_tok) == OWNER}, session→link={decode_link_token(sess_tok)}, link→session={decode_session_token(link_tok)}",
+        decode_link_token(link_tok) == OWNER and decode_link_token(sess_tok) is None and decode_session_token(link_tok) is None)
+R.check("G2", "トークン", "OAuthのstateに載せる値として、30日有効のセッショントークンは受け付けない", "連携先なし(None)",
+        parse_oauth_state(f"settings|{sess_tok}"), parse_oauth_state(f"settings|{sess_tok}") == ("/settings", None))
+R.check("G3", "トークン", "OAuthのstateは、追加連携用トークンなら連携先を解釈し、でたらめな値でも落ちない", "(/settings, OWNER) と (/settings, None)",
+        [parse_oauth_state(f"settings|{link_tok}")[1] == OWNER, parse_oauth_state("settings|garbage")],
+        parse_oauth_state(f"settings|{link_tok}") == ("/settings", OWNER) and parse_oauth_state("settings|garbage") == ("/settings", None))
+r = c.get("/api/auth/link-token")
+R.check("G4", "トークン", "GET /api/auth/link-token：ログイン中は発行、未ログインは401", "200 / 401",
+        f"{r.status_code} / {anon.get('/api/auth/link-token').status_code}",
+        r.status_code == 200 and decode_link_token(r.json()["token"]) == OWNER and anon.get("/api/auth/link-token").status_code == 401)
+r = httpx.get(BASE + "/api/tasks", headers={"Authorization": "Bearer " + link_tok})
+R.check("G5", "トークン", "追加連携用トークンをAPIの認証に使うと401（500ではない）", "401", r.status_code, r.status_code == 401)
+r1 = httpx.get(BASE + "/api/tasks", headers={"Authorization": "Bearer " + _aged_token(1)})
+r2 = httpx.get(BASE + "/api/tasks", headers={"Authorization": "Bearer " + _aged_token(10)})
+renewed = decode_session_token(r2.headers.get("x-session-token", "")) if r2.headers.get("x-session-token") else None
+R.check("G6", "セッション", "使っている間は切れないよう、発行から7日を過ぎたセッションは自動で新しいトークンに更新される", "1日目は更新なし／10日目は新トークン(30日)",
+        f"1日目:{'更新あり' if 'x-session-token' in r1.headers else '更新なし'} / 10日目:{'更新あり' if renewed else '更新なし'}",
+        r1.status_code == 200 and "x-session-token" not in r1.headers and bool(renewed) and renewed["sub"] == OWNER and renewed["exp"] - renewed["iat"] == 30 * 86400)
+r3 = httpx.get(BASE + "/api/tasks", headers={"Origin": "http://localhost:5173", "Authorization": "Bearer " + _aged_token(10)})
+R.check("G7", "セッション", "ブラウザが更新トークン(X-Session-Token)を読める（CORS設定）", "expose-headersに含まれる",
+        r3.headers.get("access-control-expose-headers", ""), "x-session-token" in r3.headers.get("access-control-expose-headers", "").lower())
+r = httpx.get(BASE + "/api/tasks", headers={"Authorization": "Bearer " + _jwt.encode({"sub": OWNER, "email": "a", "exp": int(time.time()) - 5}, settings.session_secret, algorithm="HS256")})
+R.check("G8", "セッション", "期限切れのセッションは401", "401", r.status_code, r.status_code == 401)
+
 R.save()
