@@ -51,6 +51,30 @@ async def _upcoming_events(user_id: str, until_minutes: int) -> list[dict]:
     return dedupe_events(events)
 
 
+PREVIOUS_NOTE_PUSH_CHARS = 40  # 通知はロック画面に出るため、メモの内容は短く切る
+
+
+async def _previous_note_text(user_id: str, ev: dict) -> str | None:
+    """予定の「前回のメモ」を、通知に添える短い文にする。無い・取得できない場合は None（通知は止めない）。"""
+    if ev.get("all_day") or not ev.get("start"):
+        return None
+    try:
+        note = await asyncio.to_thread(
+            notes_svc.previous_note,
+            user_id,
+            refs=notes_svc.refs_for_event(ev),
+            title=ev.get("title") or "",
+            series_key=ev.get("series_id"),
+            before=ev["start"],
+        )
+    except Exception:  # noqa: BLE001  メモ未準備・不正な日時などでも、本来の通知は送る
+        return None
+    if not note:
+        return None
+    text = notes_svc.snippet_of(note["body"])
+    return text[:PREVIOUS_NOTE_PUSH_CHARS] + ("…" if len(text) > PREVIOUS_NOTE_PUSH_CHARS else "")
+
+
 def _fmt_time(iso: str) -> str:
     try:
         return datetime.fromisoformat(iso).astimezone(JST).strftime("%H:%M")
@@ -95,6 +119,9 @@ async def run_reminders() -> dict:
             )
             if ev.get("location"):
                 body += f"（{ev['location']}）"
+            prev = await _previous_note_text(user["user_id"], ev)
+            if prev:
+                body += f"／前回のメモ: {prev}"
             total_sent += push.send_to_user(
                 user["user_id"], title="まもなくお時間です", body=body, url="/", tag=ev["id"]
             )
@@ -150,6 +177,16 @@ async def run_briefing() -> dict:
                 body += " ほか"
         else:
             body = "本日のご予定はございません"
+        # 前回のメモがある会議を、最大2件まで添える
+        recalled = []
+        for e in events[:5]:
+            prev = await _previous_note_text(user["user_id"], e)
+            if prev:
+                recalled.append(f"{e['title']}「{prev}」")
+            if len(recalled) >= 2:
+                break
+        if recalled:
+            body += "／前回のメモ: " + "、".join(recalled)
         if tasks:
             body += f"／期限の近いタスクが{len(tasks)}件ございます"
 

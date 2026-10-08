@@ -80,6 +80,27 @@ async def extract_tasks(body: ExtractTasksRequest, user: SessionUser = Depends(g
     return {"tasks": await notes_svc.extract_tasks(body.text, today)}
 
 
+@router.get("/previous")
+async def previous(
+    refs: str = Query(max_length=1000, description="この会議の識別情報（カンマ区切り）"),
+    title: str = Query(max_length=500),
+    start: str = Query(max_length=64),
+    series_key: str | None = Query(default=None, max_length=500),
+    user: SessionUser = Depends(get_current_user),
+):
+    """この会議の「前回のメモ」（同じ定例・同じ件名の、これより前の会議で一番新しいメモ）。無ければ note=null。"""
+    ref_list = [r for r in refs.split(",") if r][:6]
+    try:
+        note = await asyncio.to_thread(
+            notes_svc.previous_note, user.user_id, refs=ref_list, title=title, series_key=series_key, before=start
+        )
+    except notes_svc.NotesUnavailable:
+        return {"note": None}  # 準備中でも、画面は「前回なし」として扱う（編集画面を壊さない）
+    except ValueError:
+        raise HTTPException(status_code=422, detail="予定の日時の形式が正しくありません") from None
+    return {"note": notes_svc.to_public(note) if note else None}
+
+
 # 注意: "/search" は "/{note_id}" より前に定義する（後ろだと、"search"がIDとして扱われてしまう）
 @router.get("/search")
 async def search(

@@ -19,6 +19,7 @@ import {
   listEvents,
   listEventsRange,
   getNote,
+  getPreviousNote,
   deleteNoteApi,
   saveNote,
   toDateStr,
@@ -87,6 +88,25 @@ export function CalendarPage() {
   const { events: demoEvents, profile, addEvent, updateEvent, deleteEvent, resetEvents } = useProfile()
   const { settings } = useSettings()
   const [editing, setEditing] = useState<CalendarEvent | null>(null)
+  // これから行う会議を開いたとき、同じ定例・同じ件名の「前回のメモ」を見返せるように取得する
+  const [previousNote, setPreviousNote] = useState<{ title: string; start: string; body: string } | null>(null)
+  useEffect(() => {
+    setPreviousNote(null)
+    if (!editing || !hasBackend() || !getSession() || editing.id.startsWith('usr-')) return
+    if (new Date(editing.end).getTime() < Date.now() || isOffline()) return
+    let cancelled = false
+    getPreviousNote({
+      refs: editing.refs ?? [],
+      title: editing.title,
+      start: editing.start,
+      seriesKey: editing.seriesId ?? null,
+    })
+      .then((r) => !cancelled && r.note && setPreviousNote({ title: r.note.title, start: r.note.start, body: r.note.body }))
+      .catch(() => {}) // 前回のメモは付加情報。取れなくても編集画面は使える
+    return () => {
+      cancelled = true
+    }
+  }, [editing?.id]) // eslint-disable-line react-hooks/exhaustive-deps
   const [isNew, setIsNew] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('list')
@@ -486,6 +506,7 @@ export function CalendarPage() {
           errorText={saveError}
           lockCalendar={backendMode}
           onDeleteNote={backendMode && editing.noteId ? handleDeleteNote : undefined}
+          previousNote={previousNote}
         />
       )}
     </div>

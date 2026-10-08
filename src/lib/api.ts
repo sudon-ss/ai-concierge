@@ -342,6 +342,13 @@ export function deleteNoteApi(id: string) {
   return apiFetch<{ ok: boolean }>(`/api/notes/${id}`, { method: 'DELETE' })
 }
 
+/** この会議の「前回のメモ」（同じ定例・同じ件名の、これより前で一番新しいメモ）。無ければ note=null */
+export function getPreviousNote(input: { refs: string[]; title: string; start: string; seriesKey?: string | null }) {
+  const qs = new URLSearchParams({ refs: input.refs.join(','), title: input.title, start: input.start })
+  if (input.seriesKey) qs.set('series_key', input.seriesKey)
+  return apiFetch<{ note: ApiNote | null }>(`/api/notes/previous?${qs.toString()}`)
+}
+
 /** Pushの「メモを残しますか？」から開いたとき、対象の予定を識別情報（"google:<ID>" 等）で取得する */
 export function findEventByRef(ref: string) {
   return apiFetch<ApiEvent>(`/api/events/find?ref=${encodeURIComponent(ref)}`)

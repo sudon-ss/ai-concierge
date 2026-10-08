@@ -197,4 +197,44 @@ R.check("N36", "段階2API", "設定の保存：メモ促しの設定を保存�
 r = a.put("/api/settings", json={"meeting_note_prompt_enabled": "abc"})
 R.check("N37", "段階2API", "設定の保存：不正な値は422", "422", r.status_code, r.status_code == 422)
 
+
+# 段階3: 前回のメモ
+def put_note(refs, title, start, body, series=None):
+    return a.put("/api/notes", json=dict(refs=refs, title=title, start=start, end=start, series_key=series, body=body, use_ai=False))
+
+
+def prev(refs, title, start, series=None):
+    params = {"refs": ",".join(refs), "title": title, "start": start}
+    if series:
+        params["series_key"] = series
+    r = a.get("/api/notes/previous", params=params)
+    return r, (r.json().get("note") if r.status_code == 200 else None)
+
+
+put_note(["google:p1"], "月次定例会", "2026-08-01T10:00:00+09:00", "8月の議事", "ser-p")
+put_note(["google:p2"], "月次定例会", "2026-09-01T10:00:00+09:00", "9月の議事", "ser-p")
+put_note(["google:p3"], "［仮］月次 定例会", "2026-09-15T10:00:00+09:00", "9月中旬（同じ件名）")
+put_note(["google:p4"], "別の会議", "2026-09-20T10:00:00+09:00", "無関係")
+r, note = prev(["google:p5"], "月次定例会", "2026-10-01T10:00:00+09:00", "ser-p")
+R.check("N38", "前回メモ", "同じシリーズ・同じ件名のうち、これより前で一番新しいメモを返す", "9月中旬（同じ件名）", note and note["body"], bool(note) and note["body"] == "9月中旬（同じ件名）")
+r, note = prev(["google:p5"], "月次定例会", "2026-09-10T10:00:00+09:00", "ser-p")
+R.check("N39", "前回メモ", "より前の日付で聞けば、その時点の前回（9/1）", "9月の議事", note and note["body"], bool(note) and note["body"] == "9月の議事")
+r, note = prev(["google:p2"], "月次定例会", "2026-09-10T10:00:00+09:00", "ser-p")
+R.check("N40", "前回メモ", "この会議自身のメモは前回に含めない", "8月の議事", note and note["body"], bool(note) and note["body"] == "8月の議事")
+r, note = prev(["google:p9"], "初めての会議", "2026-10-01T10:00:00+09:00")
+R.check("N41", "前回メモ", "前回が無ければ note=null（エラーにしない）", "200 / null", f"{r.status_code} {note}", r.status_code == 200 and note is None)
+r, _ = prev(["google:p9"], "x", "壊れた日時")
+R.check("N42", "前回メモ", "日時が不正なら422", "422", r.status_code, r.status_code == 422)
+R.check("N43", "前回メモ", "ログインなしは401", "401", anon.get("/api/notes/previous", params={"refs": "google:a", "title": "x", "start": "2026-10-01T10:00:00+09:00"}).status_code,
+        anon.get("/api/notes/previous", params={"refs": "google:a", "title": "x", "start": "2026-10-01T10:00:00+09:00"}).status_code == 401)
+other = b.get("/api/notes/previous", params={"refs": "google:a", "title": "月次定例会", "start": "2026-10-01T10:00:00+09:00", "series_key": "ser-p"}).json()
+R.check("N44", "前回メモ", "他のユーザーのメモは見えない", "note=null", other, other == {"note": None})
+
+
+o = chat(a, "月次定例会のこれまでの流れを、古い順にまとめて")
+used = [t.get("name") for t in o["tool_events"]]
+rep = o["reply"]
+R.check("N45", "チャット(履歴)", "「〇〇のこれまでの流れ」で、過去メモを古い順にまとめて答える", "search_notesを呼び、8月→9月の順に触れる",
+        f"tools={used} 返答={rep[:150]!r}", "search_notes" in used and "8月" in rep and "9月" in rep and rep.find("8月") < rep.find("9月"))
+
 R.save()

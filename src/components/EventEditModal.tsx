@@ -13,6 +13,8 @@ interface Props {
   lockCalendar?: boolean
   /** この予定に会議メモがあるとき、メモだけを削除する（自動では消えないため、利用者が個別に削除する） */
   onDeleteNote?: () => void
+  /** 同じ定例・同じ件名の、これより前の会議のメモ（会議の前に見返す用） */
+  previousNote?: { title: string; start: string; body: string } | null
 }
 
 const toLocalInputValue = (iso: string): string => {
@@ -25,7 +27,7 @@ const fromLocalInputValue = (value: string): string => {
   return new Date(value).toISOString()
 }
 
-export function EventEditModal({ event, onClose, onSave, onDelete, errorText, lockCalendar, onDeleteNote }: Props) {
+export function EventEditModal({ event, onClose, onSave, onDelete, errorText, lockCalendar, onDeleteNote, previousNote }: Props) {
   const [title, setTitle] = useState(event.title)
   const [location, setLocation] = useState(event.location ?? '')
   const [memo, setMemo] = useState(event.memo ?? '')
@@ -162,6 +164,17 @@ export function EventEditModal({ event, onClose, onSave, onDelete, errorText, lo
               />
             </div>
           </label>
+
+          {previousNote && (
+            <div className="rounded-md border border-gold-200 bg-cream-50 p-3">
+              <p className="text-xs font-semibold text-gold-700">
+                前回のメモ（{new Date(previousNote.start).toLocaleDateString('ja-JP', { month: 'long', day: 'numeric' })}）
+              </p>
+              <p className="mt-1 text-sm text-navy-800 whitespace-pre-wrap max-h-40 overflow-y-auto">
+                {previousNote.body}
+              </p>
+            </div>
+          )}
 
           <label className="block">
             <span className="text-xs font-medium text-navy-700">メモ</span>

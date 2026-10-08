@@ -293,6 +293,33 @@ def search_notes(
 
 
 @_guard
+def previous_note(
+    user_id: str, *, refs: list[str], title: str, series_key: str | None, before: str
+) -> dict | None:
+    """この会議の「前回のメモ」。同じ繰り返し予定（シリーズID）か、同じ件名（正規化）の会議のうち、
+    この会議より前で一番新しいメモを返す。この会議自身のメモは含めない。"""
+    before_iso = _iso(before)
+    sb = get_supabase()
+    key = normalize_title(title)
+    queries = []
+    if series_key:
+        queries.append(sb.table(TABLE).select("*").eq("user_id", user_id).eq("series_key", series_key))
+    if key:
+        queries.append(sb.table(TABLE).select("*").eq("user_id", user_id).eq("title_key", key))
+    mine = set(refs)
+    best: dict | None = None
+    for q in queries:
+        rows = q.lt("event_start", before_iso).order("event_start", desc=True).limit(5).execute().data
+        for r in rows:
+            if mine & set(r.get("event_refs") or []) or not (r.get("body") or "").strip():
+                continue
+            if best is None or r["event_start"] > best["event_start"]:
+                best = r
+            break
+    return best
+
+
+@_guard
 def notes_in_window(user_id: str, start_utc: datetime, end_utc: datetime) -> list[dict]:
     """予定一覧に「メモあり」を付けるための突き合わせ候補（軽量な列だけ）。"""
     margin = timedelta(days=ANNOTATE_MARGIN_DAYS)
