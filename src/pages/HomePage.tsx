@@ -7,6 +7,7 @@ import { Wordmark } from '../components/Wordmark'
 import { ConciergeMark } from '../components/ConciergeMark'
 import { ConnectionNoticeBanner } from '../components/ConnectionNoticeBanner'
 import { getSession, hasBackend, listEvents } from '../lib/api'
+import { useOnlineRefresh } from '../hooks/useOnlineRefresh'
 import type { CalendarEvent } from '../types'
 
 const fmtTime = (iso: string) =>
@@ -20,7 +21,7 @@ export function HomePage() {
   const backendMode = hasBackend() && Boolean(getSession())
   const [realEvents, setRealEvents] = useState<CalendarEvent[]>([])
 
-  useEffect(() => {
+  const loadReal = () => {
     if (!backendMode) return
     listEvents()
       .then((apiEvents) =>
@@ -36,7 +37,13 @@ export function HomePage() {
         ),
       )
       .catch(() => {})
+  }
+
+  useEffect(() => {
+    loadReal()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [backendMode])
+  useOnlineRefresh(loadReal, backendMode) // 通信が戻ったら、古い控えを取り直す
 
   const events = backendMode ? realEvents : demoEvents
 

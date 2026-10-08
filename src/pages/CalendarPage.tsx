@@ -7,6 +7,8 @@ import { MemoBlock } from '../components/MemoBlock'
 import { EventEditModal } from '../components/EventEditModal'
 import { CalendarGridView, type GridViewMode } from '../components/CalendarGridView'
 import { ConnectionNoticeBanner } from '../components/ConnectionNoticeBanner'
+import { isOffline, OFFLINE_ACTION_MESSAGE } from '../lib/offlineCache'
+import { useOnlineRefresh } from '../hooks/useOnlineRefresh'
 import type { CalendarEvent } from '../types'
 import {
   deleteEventApi,
@@ -133,6 +135,9 @@ export function CalendarPage() {
     }
   }, [backendMode, viewMode, gridDate, rangeKey])
 
+  // 通信が戻ったら、通信できない間に表示していた古い控えを取り直す
+  useOnlineRefresh(loadReal, backendMode)
+
   const events = backendMode ? (realEvents ?? []) : demoEvents
   const gridEvents = backendMode ? (rangeEvents ?? []) : demoEvents
 
@@ -182,6 +187,10 @@ export function CalendarPage() {
       closeEdit()
       return
     }
+    if (isOffline()) {
+      setSaveError(OFFLINE_ACTION_MESSAGE)
+      return
+    }
     setSaveError(null)
     updateEventApi({
       calendar: calendarOf(editing),
@@ -207,6 +216,10 @@ export function CalendarPage() {
       closeEdit()
       return
     }
+    if (isOffline()) {
+      setSaveError(OFFLINE_ACTION_MESSAGE)
+      return
+    }
     setSaveError(null)
     deleteEventApi({ calendar: calendarOf(editing), event_id: editing.id })
       .then(() => {
@@ -218,6 +231,10 @@ export function CalendarPage() {
 
   // Schedule一覧からモーダルを開かず直接削除する（メモ欄の「削除する」ボタンから）
   const handleQuickDelete = (e: CalendarEvent) => {
+    if (backendMode && isOffline()) {
+      window.alert(OFFLINE_ACTION_MESSAGE)
+      return
+    }
     if (!window.confirm(`「${e.title}」を削除してもよろしいでしょうか？`)) return
     if (!backendMode) {
       deleteEvent(e.id)

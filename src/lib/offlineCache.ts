@@ -106,3 +106,23 @@ export function subscribeStale(fn: () => void): () => void {
     listeners.delete(fn)
   }
 }
+
+/** 通信できない状態か。端末が圏外・機内モードと判断している、または、通信できず最後に取得した控えを表示している間 */
+export function isOffline(): boolean {
+  return (typeof navigator !== 'undefined' && navigator.onLine === false) || staleAt !== null
+}
+
+/** 通信できないときに、操作（登録・変更・削除・相談）をお断りするときの文言 */
+export const OFFLINE_ACTION_MESSAGE =
+  '通信できないため、この操作はできません。通信できる場所で、あらためてお試しくださいませ。\n（通信できない間は、最後に取得したご予定・タスクの表示のみご利用いただけます）'
+
+// 通信が戻ったら、「古い情報を表示中」の状態を解除する（各画面は、この通知を受けて取得し直す）
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => {
+    clearStale()
+    notify()
+  })
+  window.addEventListener('offline', notify)
+}
+/** 端末の通信状態（圏外・機内モード）。バナー表示の判定に使う */
+export const getBrowserOffline = () => typeof navigator !== 'undefined' && navigator.onLine === false
