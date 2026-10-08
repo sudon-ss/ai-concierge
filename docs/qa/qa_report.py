@@ -7,6 +7,7 @@ here = Path(__file__).parent
 date = sys.argv[1] if len(sys.argv) > 1 else "2026-09-19"
 mark = {"PASS": "✅", "FAIL": "❌", "NOTE": "⚠️", "SKIP": "⏭"}
 parts = {"nocal": "1. API・認証・タスク・設定・チャット異常系・タスク照会・セッション（ダミーユーザー・未連携状態）", "ui": "2. ブラウザ画面（モバイル幅375px）",
+         "notes": "4. 会議メモ（保存・紐付け・検索・権限・入力検証・予定一覧・チャット）",
          "cal": "3. カレンダー連携ありの機能（予定CRUD・仮押さえ・空き時間・チャット操作）"}
 head = (here / "report_head.md").read_text(encoding="utf-8") if (here / "report_head.md").exists() else ""
 out = [f"# THE CONCIERGE 動作テスト記録（{date}）", "", head, ""]

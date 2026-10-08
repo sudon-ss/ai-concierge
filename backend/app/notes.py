@@ -87,10 +87,18 @@ def snippet_of(body: str) -> str:
 
 
 def _iso(value: str | None) -> str | None:
-    """予定の日時文字列（オフセット付き／なし／日付のみ）を、DBに入れるUTCのISO文字列にする。"""
+    """予定の日時文字列（オフセット付き／なし／日付のみ）を、DBに入れるUTCのISO文字列にする。
+    既存の normalize_instant は、不正な値でもエラーにせず「最小の日時」を返してしまい、そのまま
+    変換すると桁あふれで500になる。メモでは、形式が不正なら ValueError にして入力エラーとして返す。"""
     if not value:
         return None
-    return normalize_instant(value).astimezone(timezone.utc).isoformat()
+    try:
+        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        raise ValueError(f"日時の形式が正しくありません: {value}") from None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=JST)
+    return dt.astimezone(timezone.utc).isoformat()
 
 
 def _chunks(items: list[str], size: int):
@@ -270,6 +278,7 @@ def annotate_events(user_id: str, events: list[dict]) -> list[dict]:
         return events
     try:
         starts = [normalize_instant(e["start"]) for e in events if e.get("start")]
+        starts = [d for d in starts if d.year > 1]  # 日時が読み取れなかった予定（最小値）は除く
         if not starts:
             return events
         notes = notes_in_window(user_id, min(starts).astimezone(timezone.utc), max(starts).astimezone(timezone.utc))

@@ -92,7 +92,7 @@ rows = n.search_notes(A, title="清原さん定例会", date_to="2026-10-01T00:0
 R.check("N11", "検索", "会議名での検索は、全角半角・空白・［仮］の違いを吸収する（「前回の〇〇」用）", "［仮］付きを含む3件ではなく、期間内の2件",
         [r["event_start"][:10] for r in rows], len(rows) == 2)
 rows = n.search_notes(A, title="清原さん定例会", limit=10)
-R.check("N12", "検索", "［仮］付き・全角空白入りの同名会議も、同じ会議として見つかる", "3件", len(rows), len(rows) == 3)
+R.check("N12", "検索", "［仮］付き・全角空白入りの同名会議も、同じ会議として見つかる", "4件（9/17・9/24・10/3の通常の3件＋［仮］付き1件）", len(rows), len(rows) == 4)
 res = a.get("/api/notes/search", params={"q": "ベンダー", "limit": 1}).json()
 R.check("N13", "検索", "検索結果の本文は要約（全文ではない）、limitが効く", "1件", len(res), len(res) == 1)
 
