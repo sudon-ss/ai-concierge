@@ -26,6 +26,7 @@ import {
   type TentativeRef,
   type ToolStartInfo,
 } from '../lib/api'
+import { isOffline } from '../lib/offlineCache'
 
 const uid = () => Math.random().toString(36).slice(2, 9)
 
@@ -375,6 +376,24 @@ export function ChatPage() {
       createdAt: new Date().toISOString(),
       content: { type: 'text', text },
     })
+
+    // 通信できない間は、AIに送れない。送ってから「通信エラー」と出るのではなく、できない理由と
+    // 「通信できる場所で」とお伝えする（この返答は端末内だけの案内で、会話履歴には保存されない）
+    if (hasBackend() && getSession() && isOffline()) {
+      append({
+        id: uid(),
+        role: 'assistant',
+        createdAt: new Date().toISOString(),
+        content: {
+          type: 'text',
+          text:
+            '恐れ入ります、現在通信できないため、ご相談（空き時間のご確認、ご予定の登録・変更・削除など）を承ることができません。' +
+            '通信できる場所で、あらためてお申し付けくださいませ。\n\n' +
+            '※ 通信できない間は、最後に取得したご予定・タスクの表示のみご利用いただけます。',
+        },
+      })
+      return
+    }
 
     // 実バックエンド（VITE_API_BASE_URL設定済み）にログイン済みなら本物のClaude Tool Useへ。
     // 未設定・未ログイン時はPhase 0からのローカル辞書ベースのデモ応答にフォールバックする。

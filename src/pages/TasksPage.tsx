@@ -13,6 +13,8 @@ import {
   deleteTaskApi,
   type ApiTask,
 } from '../lib/api'
+import { isOffline, OFFLINE_ACTION_MESSAGE } from '../lib/offlineCache'
+import { useOnlineRefresh } from '../hooks/useOnlineRefresh'
 
 const newDraftTask = (): Task => {
   const due = new Date()
@@ -64,15 +66,21 @@ export function TasksPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [backendMode])
 
+  useOnlineRefresh(loadReal, backendMode) // 通信が戻ったら、古い控えを取り直す
+
   const tasks = backendMode ? realTasks : demoTasks
 
   const toggle = (id: string) => {
     const target = tasks.find((t) => t.id === id)
     if (!target) return
     if (backendMode) {
+      if (isOffline()) {
+        window.alert(OFFLINE_ACTION_MESSAGE)
+        return
+      }
       updateTaskApi(id, { done: !target.done })
         .then(loadReal)
-        .catch(() => {})
+        .catch(() => window.alert('恐れ入ります、操作に失敗いたしました。通信状況をご確認のうえ、もう一度お試しくださいませ。'))
       return
     }
     updateDemoTask(id, { done: !target.done })
@@ -96,6 +104,11 @@ export function TasksPage() {
   const handleSave = (updates: Partial<Task>) => {
     if (!editing) return
     if (backendMode) {
+      if (isOffline()) {
+        // 入力した内容を失わないよう、編集画面は閉じずに、できない理由をお伝えする
+        window.alert(OFFLINE_ACTION_MESSAGE)
+        return
+      }
       const promise = isNew
         ? createTask({
             title: updates.title ?? editing.title,
@@ -107,7 +120,7 @@ export function TasksPage() {
             due_date: updates.dueDate,
             priority: updates.priority,
           })
-      promise.then(loadReal).catch(() => {})
+      promise.then(loadReal).catch(() => window.alert('恐れ入ります、操作に失敗いたしました。通信状況をご確認のうえ、もう一度お試しくださいませ。'))
       closeEdit()
       return
     }
@@ -122,9 +135,13 @@ export function TasksPage() {
   const handleDelete = () => {
     if (!editing) return
     if (backendMode) {
+      if (isOffline()) {
+        window.alert(OFFLINE_ACTION_MESSAGE)
+        return
+      }
       deleteTaskApi(editing.id)
         .then(loadReal)
-        .catch(() => {})
+        .catch(() => window.alert('恐れ入ります、操作に失敗いたしました。通信状況をご確認のうえ、もう一度お試しくださいませ。'))
       closeEdit()
       return
     }

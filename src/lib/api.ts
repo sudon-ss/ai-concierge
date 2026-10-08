@@ -2,6 +2,8 @@
 // バックエンド（backend/）が起動していない・セッションが無い場合は
 // 呼び出し元がフォールバックできるよう null / エラーを返す設計にしている。
 
+import { clearAllCache, clearStale, loadCache, markStale, saveCache } from './offlineCache'
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL as string | undefined
 
 const SESSION_KEY = 'concierge.session.v1'
@@ -16,6 +18,7 @@ export function setSession(token: string): void {
 
 export function clearSession(): void {
   localStorage.removeItem(SESSION_KEY)
+  clearAllCache() // ログアウト後に、端末へ予定・タスクの控えを残さない
 }
 
 export function hasBackend(): boolean {
@@ -70,6 +73,32 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(`API error ${res.status}: ${await res.text()}`)
   }
   return res.json() as Promise<T>
+}
+
+/** 通信自体に失敗した（圏外・機内モード等）、またはサーバーが一時的に応答しない（502/503/504。再起動中など）場合 */
+function isOfflineError(e: unknown): boolean {
+  if (e instanceof TypeError) return true // fetchのネットワークエラー
+  return e instanceof Error && /^API error (502|503|504):/.test(e.message)
+}
+
+/** 読み取り専用のAPI用。成功したら結果を端末に保存し、通信に失敗したときだけ最後に取得できた内容を返す
+ * （画面には「◯時点の情報を表示しています」のバナーが出る）。401などの通常のエラーでは返さない。 */
+async function cachedGet<T>(key: string, path: string, allowStale = true): Promise<T> {
+  try {
+    const data = await apiFetch<T>(path)
+    saveCache(key, data)
+    clearStale()
+    return data
+  } catch (e) {
+    if (allowStale && isOfflineError(e)) {
+      const cached = loadCache<T>(key)
+      if (cached) {
+        markStale(cached.savedAt)
+        return cached.data
+      }
+    }
+    throw e
+  }
 }
 
 /** 遷移先（onboarding/settings）に加え、既にログイン中なら「追加連携用」の短命トークン（10分）を
@@ -207,7 +236,7 @@ export interface ApiTask {
 }
 
 export function listTasks(): Promise<ApiTask[]> {
-  return apiFetch<ApiTask[]>('/api/tasks')
+  return cachedGet<ApiTask[]>('tasks', '/api/tasks')
 }
 
 export function createTask(input: { title: string; due_date?: string; priority?: string }) {
@@ -256,8 +285,9 @@ export interface BriefingResponse {
 }
 
 /** カレンダー画面用: デモデータではなく実際に連携済みのカレンダーの予定一覧を取得する */
-export function listEvents(days = 30): Promise<ApiEvent[]> {
-  return apiFetch<ApiEvent[]>(`/api/events?days=${days}`)
+/** allowStale=false：通信できないときに古い内容を返さない（リマインダーの判定など、最新が必須の用途） */
+export function listEvents(days = 30, allowStale = true): Promise<ApiEvent[]> {
+  return cachedGet<ApiEvent[]>(`events.${days}`, `/api/events?days=${days}`, allowStale)
 }
 
 const pad2 = (n: number) => String(n).padStart(2, '0')
@@ -265,11 +295,12 @@ export const toDateStr = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 
 
 /** 日／週／月表示用: 指定期間（両端の日を含む）の予定を取得する。過去や1か月より先も見られる */
 export function listEventsRange(start: Date, end: Date): Promise<ApiEvent[]> {
-  return apiFetch<ApiEvent[]>(`/api/events/range?start=${toDateStr(start)}&end=${toDateStr(end)}`)
+  const qs = `start=${toDateStr(start)}&end=${toDateStr(end)}`
+  return cachedGet<ApiEvent[]>(`range.${toDateStr(start)}_${toDateStr(end)}`, `/api/events/range?${qs}`)
 }
 
 export function getBriefing(): Promise<BriefingResponse> {
-  return apiFetch<BriefingResponse>('/api/briefing')
+  return cachedGet<BriefingResponse>('briefing', '/api/briefing')
 }
 
 export interface CreateEventInput {

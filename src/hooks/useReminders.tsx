@@ -39,7 +39,7 @@ export function useReminders() {
   useEffect(() => {
     if (!backendMode) return
     const load = () => {
-      listEvents(2)
+      listEvents(2, false)
         .then((apiEvents) =>
           setRealEvents(
             apiEvents.map((e) => ({
