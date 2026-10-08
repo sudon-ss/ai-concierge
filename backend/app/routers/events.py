@@ -9,6 +9,7 @@ from pydantic import BaseModel, field_validator
 from ..calendar_service import dedupe_events, get_connected_adapters, normalize_instant
 from ..dependencies import get_current_user
 from ..models import CalendarSource, SessionUser
+from .. import notes as notes_svc
 from ..notes import annotate_events
 from ..tools import (
     create_event,
@@ -68,6 +69,31 @@ async def list_events_range_endpoint(start: str, end: str, user: SessionUser = D
     events = dedupe_events([ev for lst in events_lists for ev in lst])
     events.sort(key=lambda e: normalize_instant(e["start"]))
     return await asyncio.to_thread(annotate_events, user.user_id, events)  # メモの有無（📝）を付ける
+
+
+FIND_BACK_DAYS = 14
+
+
+@router.get("/find")
+async def find_event_endpoint(
+    ref: str = Query(..., max_length=300), user: SessionUser = Depends(get_current_user)
+):
+    """メモ促しのPushから開いたときに、対象の予定（"google:<ID>" / "outlook:<ID>"）を1件取り出す。
+    会議の直後に開くことが多いので、過去2週間〜明日を探す。"""
+    provider, _, ext = ref.partition(":")
+    if provider not in ("google", "outlook") or not ext:
+        raise HTTPException(status_code=422, detail="予定の識別情報の形式が正しくありません")
+    now = datetime.now(JST)
+    adapters = await get_connected_adapters(user.user_id)
+    lists = await asyncio.gather(
+        *[a.list_events(now - timedelta(days=FIND_BACK_DAYS), now + timedelta(days=1)) for a in adapters.values()],
+        return_exceptions=True,
+    )
+    events = dedupe_events([ev for lst in lists if not isinstance(lst, Exception) for ev in lst])
+    target = next((e for e in events if ref in notes_svc.refs_for_event(e)), None)
+    if target is None:
+        raise HTTPException(status_code=404, detail="予定が見つかりませんでした")
+    return (await asyncio.to_thread(annotate_events, user.user_id, [target]))[0]
 
 
 class CreateEventRequest(BaseModel):

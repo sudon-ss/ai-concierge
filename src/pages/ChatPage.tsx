@@ -12,12 +12,16 @@ import { detectScheduleIntent, extractIntent, type ExtractedIntent } from '../li
 import {
   clearChatHistory,
   confirmEvent,
+  createTask,
   deleteEventApi,
+  extractNoteTasks,
+  findEventByRef,
   getBriefing,
   getSession,
   hasBackend,
   holdTentativeSlots,
   releaseTentativeSlots,
+  saveNote,
   sendChatMessageStream,
   toTentativeRef,
   type ApiEvent,
@@ -26,9 +30,23 @@ import {
   type TentativeRef,
   type ToolStartInfo,
 } from '../lib/api'
-import { isOffline } from '../lib/offlineCache'
+import { isOffline, OFFLINE_ACTION_MESSAGE } from '../lib/offlineCache'
 
 const uid = () => Math.random().toString(36).slice(2, 9)
+
+/** 予定（重複統合済み）を指す識別情報の一覧。サーバー側の notes.refs_for_event と同じ規則 */
+const refsOf = (ev: ApiEvent): string[] => {
+  const copies = ev.copies && ev.copies.length > 0 ? ev.copies : [{ id: ev.id, source: ev.source }]
+  const refs: string[] = []
+  for (const c of copies) {
+    const r = `${c.source === 'both' ? 'google' : c.source}:${c.id}`
+    if (!refs.includes(r)) refs.push(r)
+  }
+  return refs
+}
+
+// 通知から開いたメモ促し（?memo=）を、同じ予定について二重に出さないための記録
+const handledMemoRefs = new Set<string>()
 
 const TOOL_STATUS_LABELS: Record<string, string> = {
   get_free_slots: '🔍 空き時間を確認しています…',
@@ -270,6 +288,127 @@ export function ChatPage() {
   }, [])
 
   const append = (msg: ChatMessage) => setMessages((m) => [...m, msg])
+
+  // 通知「メモを残しますか？」から開かれたとき（/chat?memo=<予定の識別情報>）、対象の会議のカードを出す
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const ref = params.get('memo')
+    if (!ref) return
+    window.history.replaceState(null, '', window.location.pathname) // 再読み込みで二重に出さない
+    if (handledMemoRefs.has(ref)) return
+    handledMemoRefs.add(ref)
+    const say = (text: string) =>
+      append({ id: uid(), role: 'assistant', createdAt: new Date().toISOString(), content: { type: 'text', text } })
+    if (!(hasBackend() && getSession())) return
+    findEventByRef(ref)
+      .then((ev) => {
+        if (ev.note) {
+          say(`「${ev.title}」には、すでにメモがございます。ご予定の画面から確認・追記いただけます。`)
+          return
+        }
+        append({
+          id: uid(),
+          role: 'assistant',
+          createdAt: new Date().toISOString(),
+          content: {
+            type: 'note_prompt',
+            refs: refsOf(ev),
+            eventTitle: ev.title,
+            eventStart: ev.start,
+            eventEnd: ev.end,
+            seriesKey: ev.series_id ?? null,
+            status: 'asking',
+          },
+        })
+      })
+      .catch(() =>
+        say(
+          isOffline()
+            ? '恐れ入ります、現在通信できないため、会議の情報を取得できませんでした。通信できる場所で、あらためてお試しくださいませ。'
+            : '恐れ入ります、対象の会議が見つかりませんでした。ご予定の画面から、メモを残していただけます。',
+        ),
+      )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const patchNote = (id: string, patch: Partial<Extract<MessageContent, { type: 'note_prompt' }>>) =>
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === id && m.content.type === 'note_prompt' ? { ...m, content: { ...m.content, ...patch } } : m,
+      ),
+    )
+
+  const onNoteStart = (id: string) => patchNote(id, { status: 'writing', error: undefined })
+  const onNoteDismiss = (id: string) => patchNote(id, { status: 'dismissed' })
+
+  const onNoteSave = (id: string, text: string) => {
+    const msg = messages.find((m) => m.id === id)
+    if (!msg || msg.content.type !== 'note_prompt') return
+    const c = msg.content
+    if (isOffline()) {
+      patchNote(id, { status: 'writing', error: OFFLINE_ACTION_MESSAGE })
+      return
+    }
+    patchNote(id, { status: 'saving', error: undefined })
+    saveNote({
+      refs: c.refs,
+      title: c.eventTitle,
+      start: c.eventStart,
+      end: c.eventEnd,
+      series_key: c.seriesKey ?? null,
+      body: text.trim(),
+      use_ai: settings.aiMemoJudgeEnabled,
+    })
+      .then(async () => {
+        patchNote(id, { status: 'saved', savedText: text.trim() })
+        // タスクの提案は付加機能。失敗しても、メモの保存は成功のまま
+        try {
+          const { tasks } = await extractNoteTasks(text.trim())
+          if (tasks.length > 0) {
+            patchNote(id, { tasks: tasks.map((t) => ({ ...t, status: 'pending' as const })) })
+          }
+        } catch {
+          /* 提案しないだけ */
+        }
+      })
+      .catch(() =>
+        patchNote(id, { status: 'writing', error: '保存できませんでした。通信状態をご確認のうえ、もう一度お試しください。' }),
+      )
+  }
+
+  const onNoteTask = (id: string, index: number, accept: boolean) => {
+    const msg = messages.find((m) => m.id === id)
+    if (!msg || msg.content.type !== 'note_prompt' || !msg.content.tasks) return
+    const task = msg.content.tasks[index]
+    if (!task || task.status !== 'pending') return
+    const setTaskStatus = (status: 'added' | 'skipped' | 'pending') =>
+      patchNote(id, {
+        tasks: msg.content.type === 'note_prompt' ? msg.content.tasks?.map((t, i) => (i === index ? { ...t, status } : t)) : undefined,
+      })
+    if (!accept) {
+      setTaskStatus('skipped')
+      return
+    }
+    if (isOffline()) {
+      append({
+        id: uid(),
+        role: 'assistant',
+        createdAt: new Date().toISOString(),
+        content: { type: 'text', text: OFFLINE_ACTION_MESSAGE },
+      })
+      return
+    }
+    createTask({ title: task.title, due_date: task.due_date ?? undefined })
+      .then(() => setTaskStatus('added'))
+      .catch(() =>
+        append({
+          id: uid(),
+          role: 'assistant',
+          createdAt: new Date().toISOString(),
+          content: { type: 'text', text: '恐れ入ります、タスクの登録に失敗いたしました。もう一度お試しくださいませ。' },
+        }),
+      )
+  }
 
   /** 実バックエンドからの応答に空き枠・作成済みイベントが含まれていれば、
    *  Phase 0と同じSlotPicker/承認カードUIの内容を組み立てる。それ以外はテキスト。 */
@@ -914,6 +1053,10 @@ export function ChatPage() {
             onBlockAll={onBlockAll}
             onConfirmDelete={onConfirmDelete}
             onCancelDelete={onCancelDelete}
+            onNoteStart={onNoteStart}
+            onNoteSave={onNoteSave}
+            onNoteDismiss={onNoteDismiss}
+            onNoteTask={onNoteTask}
             googleConnected={settings.calendarConnected.google}
             outlookConnected={settings.calendarConnected.outlook}
           />

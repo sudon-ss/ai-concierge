@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import clsx from 'clsx'
-import { Check, MapPin, X } from 'lucide-react'
+import { Check, MapPin, NotebookPen, X } from 'lucide-react'
 import type { ChatMessage, FreeSlot, CalendarEvent } from '../types'
 import { ConciergeMark } from './ConciergeMark'
 import { BriefingCard } from './BriefingCard'
@@ -19,6 +20,10 @@ interface Props {
   onBlockAll?: (id: string) => void
   onConfirmDelete?: (id: string) => void
   onCancelDelete?: (id: string) => void
+  onNoteStart?: (id: string) => void
+  onNoteSave?: (id: string, text: string) => void
+  onNoteDismiss?: (id: string) => void
+  onNoteTask?: (id: string, index: number, accept: boolean) => void
   googleConnected?: boolean
   outlookConnected?: boolean
 }
@@ -34,6 +39,10 @@ export function MessageBubble({
   onBlockAll,
   onConfirmDelete,
   onCancelDelete,
+  onNoteStart,
+  onNoteSave,
+  onNoteDismiss,
+  onNoteTask,
   googleConnected,
   outlookConnected,
 }: Props) {
@@ -182,10 +191,158 @@ export function MessageBubble({
             )}
           </div>
         )}
+        {message.content.type === 'note_prompt' && (
+          <NotePromptCard
+            messageId={message.id}
+            content={message.content}
+            onStart={onNoteStart}
+            onSave={onNoteSave}
+            onDismiss={onNoteDismiss}
+            onTask={onNoteTask}
+          />
+        )}
         <div className={clsx('text-[10px] text-slate-400 px-1', isUser && 'text-right')}>
           {fmtTime(message.createdAt)}
         </div>
       </div>
+    </div>
+  )
+}
+
+type NotePromptContent = Extract<ChatMessage['content'], { type: 'note_prompt' }>
+
+/** 会議後に「メモを残しますか？」と尋ねるカード。残す→入力→保存→タスクの提案（はい／いいえ）まで */
+function NotePromptCard({
+  messageId,
+  content,
+  onStart,
+  onSave,
+  onDismiss,
+  onTask,
+}: {
+  messageId: string
+  content: NotePromptContent
+  onStart?: (id: string) => void
+  onSave?: (id: string, text: string) => void
+  onDismiss?: (id: string) => void
+  onTask?: (id: string, index: number, accept: boolean) => void
+}) {
+  const [text, setText] = useState('')
+  const { status } = content
+
+  return (
+    <div className="card-elevated p-3 w-full text-sm space-y-3">
+      <div>
+        <p className="text-navy-900 inline-flex items-center gap-1.5">
+          <NotebookPen size={15} className="text-gold-600" />
+          {status === 'saved' ? 'メモを保存いたしました' : '会議のメモを残しますか？'}
+        </p>
+        <p className="text-navy-800 font-medium mt-1.5">{content.eventTitle}</p>
+        <p className="text-xs text-slate-500 mt-0.5">{fmtTime(content.eventStart)} 開始</p>
+      </div>
+
+      {status === 'asking' && (
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => onStart?.(messageId)}
+            className="flex-1 rounded-md bg-gradient-to-r from-gold-500 to-gold-400 hover:from-gold-600 hover:to-gold-500 text-navy-900 text-sm font-semibold py-2"
+          >
+            メモを残す
+          </button>
+          <button
+            type="button"
+            onClick={() => onDismiss?.(messageId)}
+            className="flex-1 rounded-md border border-navy-200 text-navy-700 hover:bg-cream-50 text-sm font-semibold py-2"
+          >
+            不要
+          </button>
+        </div>
+      )}
+
+      {(status === 'writing' || status === 'saving') && (
+        <div className="space-y-2">
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            rows={5}
+            maxLength={5000}
+            disabled={status === 'saving'}
+            placeholder="決まったこと、次にやること、持っていくものなど"
+            aria-label="会議のメモ"
+            className="w-full rounded-md border border-navy-200 bg-white text-navy-900 px-2 py-1.5 text-sm"
+          />
+          {content.error && <p className="text-xs text-red-600">{content.error}</p>}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={status === 'saving' || !text.trim()}
+              onClick={() => onSave?.(messageId, text)}
+              className="flex-1 rounded-md bg-gradient-to-r from-gold-500 to-gold-400 hover:from-gold-600 hover:to-gold-500 text-navy-900 text-sm font-semibold py-2 disabled:opacity-50"
+            >
+              {status === 'saving' ? '保存しています…' : '保存する'}
+            </button>
+            <button
+              type="button"
+              disabled={status === 'saving'}
+              onClick={() => onDismiss?.(messageId)}
+              className="flex-1 rounded-md border border-navy-200 text-navy-700 hover:bg-cream-50 text-sm font-semibold py-2 disabled:opacity-50"
+            >
+              やめる
+            </button>
+          </div>
+        </div>
+      )}
+
+      {status === 'saved' && (
+        <div className="space-y-3">
+          {content.savedText && (
+            <p className="text-xs text-slate-600 whitespace-pre-wrap rounded-md bg-cream-50 border border-navy-100 p-2">
+              {content.savedText}
+            </p>
+          )}
+          {content.tasks && content.tasks.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-navy-900">メモから、次のタスクを登録しますか？</p>
+              {content.tasks.map((t, i) => (
+                <div key={i} className="rounded-md border border-navy-100 p-2">
+                  <p className="text-navy-800">{t.title}</p>
+                  {t.due_date && <p className="text-xs text-slate-500 mt-0.5">期限 {t.due_date}</p>}
+                  {t.status === 'pending' ? (
+                    <div className="flex gap-2 mt-2">
+                      <button
+                        type="button"
+                        onClick={() => onTask?.(messageId, i, true)}
+                        className="flex-1 rounded-md bg-gradient-to-r from-gold-500 to-gold-400 text-navy-900 text-sm font-semibold py-1.5"
+                      >
+                        はい
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onTask?.(messageId, i, false)}
+                        className="flex-1 rounded-md border border-navy-200 text-navy-700 hover:bg-cream-50 text-sm font-semibold py-1.5"
+                      >
+                        いいえ
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="text-xs mt-1 text-slate-500">
+                      {t.status === 'added' ? '✓ タスクに登録いたしました' : '登録しませんでした'}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {status === 'dismissed' && (
+        <div className="flex items-center gap-2 text-slate-500">
+          <X size={16} />
+          <span>メモは残しませんでした（あとから予定画面でも残せます）</span>
+        </div>
+      )}
     </div>
   )
 }

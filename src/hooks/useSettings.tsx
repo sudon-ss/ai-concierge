@@ -23,6 +23,8 @@ export interface AppSettings {
   notificationEnabled: boolean
   briefingEnabled: boolean
   aiMemoJudgeEnabled: boolean
+  /** 会議が終わったあと、メモを残すかをPushで尋ねる（既定オフ） */
+  meetingNotePromptEnabled: boolean
   calendarConnected: {
     google: boolean
     outlook: boolean
@@ -47,6 +49,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   notificationEnabled: true,
   briefingEnabled: true,
   aiMemoJudgeEnabled: true,
+  meetingNotePromptEnabled: false,
   calendarConnected: {
     google: false,
     outlook: false,
@@ -109,6 +112,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       blocked_weekdays: settings.blockedWeekdays,
       blocked_start_hour: settings.blockedStartHour,
       blocked_end_hour: settings.blockedEndHour,
+      meeting_note_prompt_enabled: settings.meetingNotePromptEnabled,
     }).catch(() => {})
   }, [
     settings.briefingEnabled,
@@ -119,6 +123,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     settings.blockedWeekdays,
     settings.blockedStartHour,
     settings.blockedEndHour,
+    settings.meetingNotePromptEnabled,
   ])
 
   useEffect(() => {

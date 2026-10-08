@@ -342,6 +342,19 @@ export function deleteNoteApi(id: string) {
   return apiFetch<{ ok: boolean }>(`/api/notes/${id}`, { method: 'DELETE' })
 }
 
+/** Pushの「メモを残しますか？」から開いたとき、対象の予定を識別情報（"google:<ID>" 等）で取得する */
+export function findEventByRef(ref: string) {
+  return apiFetch<ApiEvent>(`/api/events/find?ref=${encodeURIComponent(ref)}`)
+}
+
+/** メモ本文から、本人がやるべきことの候補を取り出す（登録はしない） */
+export function extractNoteTasks(text: string) {
+  return apiFetch<{ tasks: { title: string; due_date: string | null }[] }>('/api/notes/extract-tasks', {
+    method: 'POST',
+    body: JSON.stringify({ text }),
+  })
+}
+
 /** メモをキーワード・期間（YYYY-MM-DD）で探す。新しい予定のメモから順に返る */
 export function searchNotes(params: { q?: string; start?: string; end?: string }) {
   const qs = new URLSearchParams()
@@ -446,6 +459,7 @@ export interface ServerSettings {
   blocked_weekdays: string[]
   blocked_start_hour: number
   blocked_end_hour: number
+  meeting_note_prompt_enabled: boolean
 }
 
 export function getServerSettings(): Promise<ServerSettings> {

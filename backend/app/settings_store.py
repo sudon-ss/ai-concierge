@@ -3,6 +3,8 @@
 これまで設定は端末の localStorage だけに持っていたが、サーバー側の配信ジョブが
 「誰に何時に送るか」を知る必要があるためDBにも持たせる。
 """
+from postgrest.exceptions import APIError
+
 from .database import get_supabase
 
 DEFAULTS = {
@@ -18,7 +20,12 @@ DEFAULTS = {
     "blocked_weekdays": ["sat", "sun"],
     "blocked_start_hour": 22,
     "blocked_end_hour": 8,
+    # 会議後にメモを促すPush。通知が増えるため既定はオフ（利用者が明示的にオンにする）
+    "meeting_note_prompt_enabled": False,
 }
+
+# マイグレーション（migration_meeting_note_prompt.sql）前でも、他の設定の保存を止めないための列
+OPTIONAL_COLUMNS = ("meeting_note_prompt_enabled",)
 
 
 def get_settings(user_id: str) -> dict:
@@ -39,9 +46,15 @@ def get_settings(user_id: str) -> dict:
 def save_settings(user_id: str, patch: dict) -> dict:
     """未設定の項目は既定値のまま残るよう、既存値とマージしてから保存する。"""
     merged = {**get_settings(user_id), **{k: v for k, v in patch.items() if v is not None}}
-    get_supabase().table("user_settings").upsert(
-        {"user_id": user_id, **merged}, on_conflict="user_id"
-    ).execute()
+    table = get_supabase().table("user_settings")
+    try:
+        table.upsert({"user_id": user_id, **merged}, on_conflict="user_id").execute()
+    except APIError as exc:
+        # 追加した列がまだDBに無い場合は、その列を除いて保存し直す（他の設定の保存を巻き込まない）
+        if not any(c in str(exc) for c in OPTIONAL_COLUMNS):
+            raise
+        slim = {k: v for k, v in merged.items() if k not in OPTIONAL_COLUMNS}
+        table.upsert({"user_id": user_id, **slim}, on_conflict="user_id").execute()
     return merged
 
 

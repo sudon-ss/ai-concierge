@@ -48,6 +48,7 @@ create table user_settings (
   blocked_weekdays text[] default array['sat', 'sun'],
   blocked_start_hour int default 22,       -- 0-23時。開始>終了で日をまたぐ（22時〜翌8時等）
   blocked_end_hour int default 8,
+  meeting_note_prompt_enabled boolean default false,  -- 会議後にメモを促すPush（既定オフ）
   updated_at timestamptz default now()
 );
 
@@ -104,7 +105,7 @@ create index idx_push_subscriptions_user on push_subscriptions (user_id);
 create table sent_notifications (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references users(id) on delete cascade,
-  kind text not null check (kind in ('reminder', 'briefing')),
+  kind text not null check (kind in ('reminder', 'briefing', 'meeting_note')),
   dedup_key text not null,   -- reminder: 予定のext_id / briefing: YYYY-MM-DD
   sent_at timestamptz default now(),
   unique (user_id, kind, dedup_key)

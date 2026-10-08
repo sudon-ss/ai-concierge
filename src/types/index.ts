@@ -89,6 +89,22 @@ export type MessageContent =
       calendar?: CalendarEvent['source']
       status: 'pending' | 'done' | 'cancelled'
     }
+  | {
+      /** 会議が終わったあと「メモを残しますか？」と尋ねるカード（Pushから開いたとき） */
+      type: 'note_prompt'
+      refs: string[]
+      eventTitle: string
+      eventStart: string
+      eventEnd?: string
+      seriesKey?: string | null
+      status: 'asking' | 'writing' | 'saving' | 'saved' | 'dismissed'
+      /** 保存したメモ（保存後に表示する） */
+      savedText?: string
+      /** 保存に失敗したときの案内 */
+      error?: string
+      /** メモから提案するタスク（はい／いいえ） */
+      tasks?: { title: string; due_date?: string | null; status: 'pending' | 'added' | 'skipped' }[]
+    }
 
 export interface ChatMessage {
   id: string
