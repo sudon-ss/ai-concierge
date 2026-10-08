@@ -14,6 +14,12 @@ export interface CalendarEvent {
   memo?: string
   memoPriority?: MemoPriority
   memoFlagged?: boolean
+  /** 会議メモ（予定に紐付くメモ）のID。メモがある予定にだけ付く */
+  noteId?: string
+  /** 予定の識別情報（"google:<予定ID>" など）。メモの紐付けに使う */
+  refs?: string[]
+  /** 繰り返し予定（定例会など）のシリーズID */
+  seriesId?: string | null
   /** 仮押さえフラグ */
   tentative?: boolean
   /** 仮押さえグループID（同じIDの複数枠をまとめて管理） */

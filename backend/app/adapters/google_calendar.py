@@ -66,6 +66,8 @@ def _to_common(ev: dict, calendar_id: str | None = None) -> dict:
         "location": ev.get("location"),
         "source": "google",
         "all_day": all_day,
+        # 繰り返し予定（定例会など）のシリーズID。会議メモを同じ定例会どうしでつなぐのに使う
+        "series_id": ev.get("recurringEventId"),
         # 削除時にどのカレンダーへ問い合わせるか判別するために保持する
         "calendar_id": calendar_id,
     }

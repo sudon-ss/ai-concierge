@@ -13,6 +13,7 @@ from app.routers import (
     auth_outlook,
     briefing,
     calendars,
+    notes,
     chat,
     events,
     notifications,
@@ -50,6 +51,7 @@ app.include_router(auth_outlook.router)
 app.include_router(auth_link.router)
 app.include_router(chat.router)
 app.include_router(calendars.router)
+app.include_router(notes.router)
 app.include_router(events.router)
 app.include_router(tasks.router)
 app.include_router(briefing.router)

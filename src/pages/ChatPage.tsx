@@ -39,6 +39,8 @@ const TOOL_STATUS_LABELS: Record<string, string> = {
   stage_event_deletion: '🗑️ 対象のご予定を確認しています…',
   create_task: '📝 タスクを登録しています…',
   judge_memo_importance: '📝 メモを確認しています…',
+  search_notes: '📝 会議のメモを探しています…',
+  save_note: '📝 メモを保存しています…',
 }
 
 // 同じツールが1ターン中に2回以上呼ばれた場合（大半は「3件に満たなかったので範囲を

@@ -9,6 +9,8 @@ import { CalendarGridView, type GridViewMode } from '../components/CalendarGridV
 import { ConnectionNoticeBanner } from '../components/ConnectionNoticeBanner'
 import { isOffline, OFFLINE_ACTION_MESSAGE } from '../lib/offlineCache'
 import { useOnlineRefresh } from '../hooks/useOnlineRefresh'
+import { NoteSearch } from '../components/NoteSearch'
+import { useSettings } from '../hooks/useSettings'
 import type { CalendarEvent } from '../types'
 import {
   deleteEventApi,
@@ -16,8 +18,12 @@ import {
   hasBackend,
   listEvents,
   listEventsRange,
+  getNote,
+  deleteNoteApi,
+  saveNote,
   toDateStr,
   updateEventApi,
+  type ApiEvent,
 } from '../lib/api'
 
 type ViewMode = 'list' | GridViewMode
@@ -44,20 +50,22 @@ const windowFor = (d: Date) => {
   return { start, end }
 }
 
-const toCalendarEvent = (e: {
-  id: string
-  title: string
-  start: string
-  end: string
-  source: CalendarEvent['source']
-  location?: string | null
-}): CalendarEvent => ({
+const toCalendarEvent = (e: ApiEvent): CalendarEvent => ({
   id: e.id,
   title: e.title,
   start: e.start,
   end: e.end,
   source: e.source,
   location: e.location ?? undefined,
+  // 会議メモ。一覧には要約だけが入る（編集画面を開くときに全文を取得する）
+  memo: e.note?.snippet,
+  memoPriority: e.note?.priority,
+  memoFlagged: e.note?.flagged,
+  noteId: e.note?.id,
+  refs: (e.copies && e.copies.length > 0 ? e.copies : [{ id: e.id, source: e.source }]).map(
+    (c) => `${c.source === 'both' ? 'google' : c.source}:${c.id}`,
+  ),
+  seriesId: e.series_id ?? null,
 })
 
 const newDraftEvent = (): CalendarEvent => {
@@ -77,6 +85,7 @@ const newDraftEvent = (): CalendarEvent => {
 
 export function CalendarPage() {
   const { events: demoEvents, profile, addEvent, updateEvent, deleteEvent, resetEvents } = useProfile()
+  const { settings } = useSettings()
   const [editing, setEditing] = useState<CalendarEvent | null>(null)
   const [isNew, setIsNew] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -162,8 +171,16 @@ export function CalendarPage() {
 
   const openEdit = (e: CalendarEvent) => {
     setSaveError(null)
-    setEditing(e)
     setIsNew(false)
+    if (backendMode && e.noteId) {
+      // 一覧には要約しか入っていない。要約のまま編集画面を開いて保存すると、メモの後半が
+      // 消えてしまうため、全文を取得してから開く（取得できなければ、開かない）
+      getNote(e.noteId)
+        .then((n) => setEditing({ ...e, memo: n.body, memoPriority: n.priority, memoFlagged: n.flagged }))
+        .catch(() => window.alert('恐れ入ります、メモの読み込みに失敗いたしました。もう一度お試しくださいませ。'))
+      return
+    }
+    setEditing(e)
   }
 
   const closeEdit = () => {
@@ -192,21 +209,74 @@ export function CalendarPage() {
       return
     }
     setSaveError(null)
-    updateEventApi({
-      calendar: calendarOf(editing),
-      event_id: editing.id,
-      title: updates.title,
-      start: updates.start,
-      end: updates.end,
-      location: updates.location,
-      memo: updates.memo,
-      memo_flagged: updates.memoFlagged,
-    })
+
+    // 予定そのもの（件名・時刻・場所）の変更と、会議メモの保存は、別々に反映する。
+    // メモはカレンダー本体ではなく、予定に紐付けて別に保存する。
+    const sameInstant = (a?: string, b?: string) => !!a && !!b && new Date(a).getTime() === new Date(b).getTime()
+    const eventChanged =
+      (updates.title ?? editing.title) !== editing.title ||
+      !sameInstant(updates.start, editing.start) ||
+      !sameInstant(updates.end, editing.end) ||
+      (updates.location ?? '') !== (editing.location ?? '')
+    const memoChanged =
+      (updates.memo ?? '') !== (editing.memo ?? '') ||
+      (updates.memoFlagged ?? false) !== (editing.memoFlagged ?? false)
+
+    const title = updates.title ?? editing.title
+    const start = updates.start ?? editing.start
+    const end = updates.end ?? editing.end
+
+    const run = async () => {
+      if (eventChanged) {
+        await updateEventApi({
+          calendar: calendarOf(editing),
+          event_id: editing.id,
+          title: updates.title,
+          start: updates.start,
+          end: updates.end,
+          location: updates.location,
+        })
+      }
+      if (memoChanged) {
+        await saveNote({
+          refs: editing.refs ?? [`${calendarOf(editing)}:${editing.id}`],
+          title,
+          start,
+          end,
+          series_key: editing.seriesId ?? null,
+          body: updates.memo ?? '',
+          flagged: updates.memoFlagged ?? false,
+          use_ai: settings.aiMemoJudgeEnabled,
+        })
+      }
+    }
+    run()
       .then(() => {
         closeEdit()
         loadReal()
       })
-      .catch(() => setSaveError('恐れ入ります、ご予定の更新に失敗いたしました。もう一度お試しくださいませ。'))
+      .catch((e: Error) =>
+        setSaveError(
+          /503/.test(e.message)
+            ? 'メモ機能は準備中のため、メモを保存できませんでした。しばらくしてからお試しくださいませ。'
+            : '恐れ入ります、ご予定の更新に失敗いたしました。もう一度お試しくださいませ。',
+        ),
+      )
+  }
+
+  // 会議メモだけを削除する（予定そのものは残る）。メモは自動では消えないため、利用者が個別に削除する
+  const handleDeleteNote = () => {
+    if (!editing?.noteId) return
+    if (isOffline()) {
+      setSaveError(OFFLINE_ACTION_MESSAGE)
+      return
+    }
+    deleteNoteApi(editing.noteId)
+      .then(() => {
+        closeEdit()
+        loadReal()
+      })
+      .catch(() => setSaveError('恐れ入ります、メモの削除に失敗いたしました。もう一度お試しくださいませ。'))
   }
 
   const handleDelete = () => {
@@ -320,6 +390,15 @@ export function CalendarPage() {
       </div>
 
       {backendMode && (
+        <NoteSearch
+          onJump={(d) => {
+            setGridDate(d)
+            setViewMode('day')
+          }}
+        />
+      )}
+
+      {backendMode && (
         <p className="text-[11px] text-navy-400 -mt-3">
           ご予定の新規登録は「チャット」タブからお申し付けください。変更・削除はこの一覧からも行えます。
         </p>
@@ -406,6 +485,7 @@ export function CalendarPage() {
           onDelete={handleDelete}
           errorText={saveError}
           lockCalendar={backendMode}
+          onDeleteNote={backendMode && editing.noteId ? handleDeleteNote : undefined}
         />
       )}
     </div>

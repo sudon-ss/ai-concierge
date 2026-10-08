@@ -9,6 +9,7 @@ from pydantic import BaseModel, field_validator
 from ..calendar_service import dedupe_events, get_connected_adapters, normalize_instant
 from ..dependencies import get_current_user
 from ..models import CalendarSource, SessionUser
+from ..notes import annotate_events
 from ..tools import (
     create_event,
     delete_event,
@@ -38,7 +39,7 @@ async def list_events_endpoint(
     events_lists = await asyncio.gather(*[a.list_events(now, time_max) for a in adapters.values()])
     events = dedupe_events([ev for lst in events_lists for ev in lst])
     events.sort(key=lambda e: normalize_instant(e["start"]))
-    return events
+    return await asyncio.to_thread(annotate_events, user.user_id, events)  # メモの有無（📝）を付ける
 
 
 JST = ZoneInfo("Asia/Tokyo")
@@ -66,7 +67,7 @@ async def list_events_range_endpoint(start: str, end: str, user: SessionUser = D
     events_lists = await asyncio.gather(*[a.list_events(time_min, time_max) for a in adapters.values()])
     events = dedupe_events([ev for lst in events_lists for ev in lst])
     events.sort(key=lambda e: normalize_instant(e["start"]))
-    return events
+    return await asyncio.to_thread(annotate_events, user.user_id, events)  # メモの有無（📝）を付ける
 
 
 class CreateEventRequest(BaseModel):
