@@ -11,7 +11,7 @@ import asyncio
 import logging
 
 from .config import settings
-from .jobs import REMINDER_TICK_MINUTES, run_briefing, run_reminders
+from .jobs import REMINDER_TICK_MINUTES, run_briefing, run_meeting_note_prompts, run_reminders
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,11 @@ STARTUP_DELAY_SECONDS = 30
 
 
 async def _tick() -> None:
-    for name, job in (("reminders", run_reminders), ("briefing", run_briefing)):
+    for name, job in (
+        ("reminders", run_reminders),
+        ("briefing", run_briefing),
+        ("meeting_notes", run_meeting_note_prompts),
+    ):
         try:
             result = await job()
             if result.get("sent"):

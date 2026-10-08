@@ -6,8 +6,10 @@
 import asyncio
 import logging
 from datetime import datetime, timedelta
+from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
+from . import notes as notes_svc
 from . import push
 from .calendar_service import dedupe_events, get_connected_adapters
 from .database import get_supabase
@@ -21,6 +23,14 @@ JST = ZoneInfo("Asia/Tokyo")
 REMINDER_TICK_MINUTES = 5
 # ブリーフィングの時刻一致に許容する幅（分）。Cronの起動ゆらぎを吸収する
 BRIEFING_WINDOW_MINUTES = 15
+
+# 会議後メモの促し: 終了から何分後に送るか／何分前までに終わった会議を対象にするか
+NOTE_PROMPT_DELAY_MINUTES = 5
+NOTE_PROMPT_LOOKBACK_MINUTES = 35  # 一時的な停止で取りこぼしても、同じ予定は1回だけ送る（claim_onceで重複排除）
+NOTE_PROMPT_MIN_DURATION_MINUTES = 30
+NOTE_PROMPT_DAILY_CAP = 5
+# 夜間・早朝には送らない（日本時間の 8:00〜21:59 のみ）
+NOTE_PROMPT_HOURS = range(8, 22)
 
 
 async def _upcoming_events(user_id: str, until_minutes: int) -> list[dict]:
@@ -146,5 +156,103 @@ async def run_briefing() -> dict:
         total_sent += push.send_to_user(
             user["user_id"], title="おはようございます", body=body, url="/", tag=f"briefing-{today}"
         )
+
+    return {"checked_users": checked, "sent": total_sent}
+
+
+def is_note_prompt_target(ev: dict, now: datetime) -> bool:
+    """会議後メモの促しの対象か。終日・短い予定・［仮］・まだ終わっていない（または古すぎる）予定は対象外。"""
+    if ev.get("all_day") or not ev.get("start") or not ev.get("end"):
+        return False
+    title = ev.get("title") or ""
+    if "［仮］" in title or "[仮]" in title:
+        return False
+    try:
+        start = datetime.fromisoformat(ev["start"])
+        end = datetime.fromisoformat(ev["end"])
+    except ValueError:
+        return False
+    # オフセットなしの値は日本時間として扱う
+    start = start if start.tzinfo else start.replace(tzinfo=JST)
+    end = end if end.tzinfo else end.replace(tzinfo=JST)
+    if (end - start).total_seconds() / 60 < NOTE_PROMPT_MIN_DURATION_MINUTES:
+        return False
+    ended_min_ago = (now - end).total_seconds() / 60
+    return NOTE_PROMPT_DELAY_MINUTES <= ended_min_ago <= NOTE_PROMPT_LOOKBACK_MINUTES
+
+
+def _count_sent_today(user_id: str, now: datetime) -> int:
+    midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    try:
+        rows = (
+            get_supabase()
+            .table("sent_notifications")
+            .select("id")
+            .eq("user_id", user_id)
+            .eq("kind", "meeting_note")
+            .gte("sent_at", midnight.isoformat())
+            .execute()
+            .data
+        )
+    except Exception:  # noqa: BLE001  数えられなければ0扱い（上限がゆるくなるだけで、送信は止めない）
+        return 0
+    return len(rows)
+
+
+async def _recent_events(user_id: str, back_hours: int = 12) -> list[dict]:
+    now = datetime.now(JST)
+    adapters = await get_connected_adapters(user_id)
+    if not adapters:
+        return []
+    results = await asyncio.gather(
+        *[a.list_events(now - timedelta(hours=back_hours), now) for a in adapters.values()],
+        return_exceptions=True,
+    )
+    events: list[dict] = []
+    for r in results:
+        if isinstance(r, Exception):
+            logger.warning("予定取得に失敗 user=%s: %s", user_id, r)
+            continue
+        events.extend(r)
+    return dedupe_events(events)
+
+
+async def run_meeting_note_prompts(now: datetime | None = None) -> dict:
+    """終わったばかりの会議について、メモを残すかどうかを尋ねるPushを送る（設定がオンの人だけ）。
+    メモが既にある会議・夜間・1日の上限を超える分は送らない。"""
+    now = now or datetime.now(JST)
+    if now.hour not in NOTE_PROMPT_HOURS:
+        return {"checked_users": 0, "sent": 0}
+    total_sent = 0
+    checked = 0
+
+    for user in list_users_with_push():
+        if not user.get("meeting_note_prompt_enabled") or not user["notification_enabled"]:
+            continue
+        checked += 1
+        uid = user["user_id"]
+        # 1日の上限は、今日すでに送った通知の数で見る（再起動しても数え直しにならない）
+        sent_today = _count_sent_today(uid, now)
+        for ev in sorted(await _recent_events(uid), key=lambda e: e["start"]):
+            if not is_note_prompt_target(ev, now):
+                continue
+            if sent_today >= NOTE_PROMPT_DAILY_CAP:
+                break
+            refs = notes_svc.refs_for_event(ev)
+            try:
+                if await asyncio.to_thread(notes_svc.find_note_by_refs, uid, refs):
+                    continue
+            except notes_svc.NotesUnavailable:
+                break  # メモ機能が未準備のユーザーには送らない
+            if not push.claim_once(uid, "meeting_note", refs[0]):
+                continue
+            total_sent += push.send_to_user(
+                uid,
+                title="お疲れさまでした",
+                body=f"「{ev['title']}」のメモを残しますか？",
+                url=f"/chat?memo={quote(refs[0], safe='')}",
+                tag=f"meeting-note-{refs[0]}",
+            )
+            sent_today += 1
 
     return {"checked_users": checked, "sent": total_sent}

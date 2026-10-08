@@ -1,5 +1,6 @@
 import asyncio
 import uuid
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator
@@ -66,6 +67,17 @@ async def save_note(body: NoteUpsert, user: SessionUser = Depends(get_current_us
     except ValueError:
         raise HTTPException(status_code=422, detail="予定の日時の形式が正しくありません") from None
     return notes_svc.to_public(note) if note else {"deleted": True}
+
+
+class ExtractTasksRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=notes_svc.MAX_BODY_LENGTH)
+
+
+@router.post("/extract-tasks")
+async def extract_tasks(body: ExtractTasksRequest, user: SessionUser = Depends(get_current_user)):
+    """メモ本文から、本人がやるべきことの候補を取り出す（登録はしない。画面で「はい」を押したときに登録）。"""
+    today = datetime.now(notes_svc.JST).date().isoformat()
+    return {"tasks": await notes_svc.extract_tasks(body.text, today)}
 
 
 # 注意: "/search" は "/{note_id}" より前に定義する（後ろだと、"search"がIDとして扱われてしまう）

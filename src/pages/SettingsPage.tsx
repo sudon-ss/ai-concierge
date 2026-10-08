@@ -96,9 +96,10 @@ interface ToggleProps {
   description?: string
   checked: boolean
   onChange: (v: boolean) => void
+  disabled?: boolean
 }
 
-function Toggle({ label, description, checked, onChange }: ToggleProps) {
+function Toggle({ label, description, checked, onChange, disabled }: ToggleProps) {
   return (
     <div className="flex items-start gap-3 py-3">
       <div className="flex-1">
@@ -108,8 +109,9 @@ function Toggle({ label, description, checked, onChange }: ToggleProps) {
       <button
         type="button"
         onClick={() => onChange(!checked)}
+        disabled={disabled}
         className={clsx(
-          'relative inline-flex h-6 w-11 shrink-0 rounded-full transition',
+          'relative inline-flex h-6 w-11 shrink-0 rounded-full transition disabled:opacity-50',
           checked ? 'bg-gold-500' : 'bg-navy-200',
         )}
         aria-label={checked ? 'オフにする' : 'オンにする'}
@@ -313,6 +315,13 @@ export function SettingsPage() {
             <option value={60}>1時間前</option>
           </select>
         </div>
+        <Toggle
+          label="会議のあとにメモをおすすめする"
+          description="30分以上の会議が終わった5分後に、メモを残すかをお尋ねします（通知を許可した端末に届きます。夜間は送りません）"
+          checked={settings.meetingNotePromptEnabled}
+          onChange={(v) => updateSettings({ meetingNotePromptEnabled: v })}
+          disabled={!settings.notificationEnabled}
+        />
         <PushSection />
       </section>
 

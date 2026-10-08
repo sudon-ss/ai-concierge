@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field, field_validator
 from .. import push
 from ..config import settings
 from ..dependencies import get_current_user
-from ..jobs import run_briefing, run_reminders
+from ..jobs import run_briefing, run_meeting_note_prompts, run_reminders
 from ..models import SessionUser
 from ..settings_store import get_settings, save_settings
 
@@ -77,6 +77,7 @@ class SettingsPatch(BaseModel):
     blocked_weekdays: list[str] | None = None
     blocked_start_hour: Annotated[int, Field(ge=0, le=23)] | None = None
     blocked_end_hour: Annotated[int, Field(ge=0, le=23)] | None = None
+    meeting_note_prompt_enabled: bool | None = None
 
     @field_validator("blocked_weekdays")
     @classmethod
@@ -116,3 +117,9 @@ async def job_reminders(x_cron_secret: str | None = Header(default=None)):
 async def job_briefing(x_cron_secret: str | None = Header(default=None)):
     _verify_cron(x_cron_secret)
     return await run_briefing()
+
+
+@router.post("/jobs/meeting-notes")
+async def job_meeting_notes(x_cron_secret: str | None = Header(default=None)):
+    _verify_cron(x_cron_secret)
+    return await run_meeting_note_prompts()

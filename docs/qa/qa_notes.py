@@ -175,4 +175,26 @@ R.check("N28", "チャット(保存)", "save_note：保存→追記（既存に�
         "最初のメモ" in body2 and "追記" in body2 and r3["note"]["body"] == "置き換え後の本文" and r3["note"]["series_key"] == "series-fake")
 R.check("N29", "チャット(保存)", "存在しない予定IDは、分かりやすいエラー（保存しない）", "見つかりませんでした", r4, bool(r4) and "見つかりませんでした" in r4)
 
+
+# 段階2: 会議後メモPushまわりのAPI
+import httpx  # noqa: E402
+
+anon = httpx.Client(base_url="http://localhost:8001", timeout=30)
+R.check("N30", "段階2API", "予定の検索(find)：ログインなしは401", "401", anon.get("/api/events/find?ref=google:x").status_code, anon.get("/api/events/find?ref=google:x").status_code == 401)
+r = a.get("/api/events/find?ref=bad-format")
+R.check("N31", "段階2API", "予定の検索(find)：識別情報の形式が不正なら422", "422", r.status_code, r.status_code == 422)
+r = a.get("/api/events/find?ref=google:no-such-event")
+R.check("N32", "段階2API", "予定の検索(find)：連携なし・存在しない予定は404（500にならない）", "404", r.status_code, r.status_code == 404)
+r = a.post("/api/notes/extract-tasks", json={"text": ""})
+R.check("N33", "段階2API", "タスク抽出：空の本文は422", "422", r.status_code, r.status_code == 422)
+R.check("N34", "段階2API", "タスク抽出：ログインなしは401", "401", anon.post("/api/notes/extract-tasks", json={"text": "x"}).status_code, anon.post("/api/notes/extract-tasks", json={"text": "x"}).status_code == 401)
+r = a.post("/api/notes/extract-tasks", json={"text": "見積書を10月20日までに送る。山田さんが資料を作る。"})
+tasks = r.json().get("tasks", []) if r.status_code == 200 else []
+R.check("N35", "段階2API", "タスク抽出：本人の宿題を期限付きで取り出す（他人の担当は含めない）", "見積書のタスク(期限2026-10-20)・資料作成は含まない",
+        tasks, r.status_code == 200 and any("見積" in t["title"] and t["due_date"] == "2026-10-20" for t in tasks) and not any("資料" in t["title"] for t in tasks))
+r = a.put("/api/settings", json={"meeting_note_prompt_enabled": True})
+R.check("N36", "段階2API", "設定の保存：メモ促しの設定を保存できる（DBに列が未作成でも他の設定の保存は壊れない）", "200", r.status_code, r.status_code == 200)
+r = a.put("/api/settings", json={"meeting_note_prompt_enabled": "abc"})
+R.check("N37", "段階2API", "設定の保存：不正な値は422", "422", r.status_code, r.status_code == 422)
+
 R.save()

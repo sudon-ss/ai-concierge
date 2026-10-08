@@ -150,6 +150,43 @@ async def judge_importance(text: str, use_ai: bool = True) -> str:
     return judge_by_keyword(text)
 
 
+_EXTRACT_SYSTEM = (
+    "あなたは秘書AIの補助として、会議メモから「利用者本人がやるべきこと（宿題・約束・準備）」を抜き出します。"
+    "他の人の担当、議事の経過、すでに終わったことは含めません。最大5件。JSONだけを出力してください。\n"
+    '出力形式: {"tasks": [{"title": "短い行動（40字以内）", "due_date": "YYYY-MM-DD または null"}]}\n'
+    "due_dateはメモに期限が明記されているときだけ入れる（今日の日付は次に示します）。"
+)
+
+
+async def extract_tasks(text: str, today: str) -> list[dict]:
+    """メモからタスク候補を抜き出す。AIが使えない・失敗した場合は空（提案しないだけで、保存は止めない）。"""
+    if not text.strip() or not settings.anthropic_api_key:
+        return []
+    try:
+        client = AsyncAnthropic(api_key=settings.anthropic_api_key, timeout=10.0)
+        res = await client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=500,
+            system=_EXTRACT_SYSTEM,
+            messages=[{"role": "user", "content": f"今日: {today}\n会議メモ:\n{text[:3000]}"}],
+        )
+        raw = "".join(b.text for b in res.content if b.type == "text")
+        data = json.loads(re.search(r"\{.*\}", raw, re.S).group(0))
+        out: list[dict] = []
+        for t in data.get("tasks", [])[:5]:
+            title = str(t.get("title") or "").strip()[:80]
+            if not title:
+                continue
+            due = t.get("due_date")
+            if not (isinstance(due, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", due)):
+                due = None
+            out.append({"title": title, "due_date": due})
+        return out
+    except Exception:  # noqa: BLE001
+        logger.warning("メモからのタスク抽出に失敗しました", exc_info=True)
+        return []
+
+
 # ---------------------------------------------------------------- DB操作（同期。呼び出し側でスレッドに逃がす）
 
 
