@@ -153,6 +153,25 @@ jobs.notes_svc.find_note_by_refs = raise_unavail
 claimed.clear()
 check("メモ機能が未準備なら送らない", run()["sent"] == 0)
 
+
+# ---------- 通知に「前回のメモ」を添える ----------
+long_body = "見積書を来週月曜までに送る。契約書の原本を持参する。次回は11/5に再訪して最終確認をする予定。"
+EV = {"id": "x", "source": "google", "title": "定例", "start": NOW.isoformat()}
+jobs.notes_svc.previous_note = lambda uid, **kw: {"body": long_body}
+txt = asyncio.run(jobs._previous_note_text("u1", EV))
+check("前回メモは40字で切って通知に添える", txt is not None and len(txt) <= jobs.PREVIOUS_NOTE_PUSH_CHARS + 1 and txt.endswith("…"), str(txt))
+jobs.notes_svc.previous_note = lambda uid, **kw: None
+check("前回メモが無ければ None", asyncio.run(jobs._previous_note_text("u1", EV)) is None)
+
+
+def boom(uid, **kw):
+    raise RuntimeError("db down")
+
+
+jobs.notes_svc.previous_note = boom
+check("取得に失敗しても例外にしない（本来の通知は送る）", asyncio.run(jobs._previous_note_text("u1", EV)) is None)
+check("終日の予定には添えない", asyncio.run(jobs._previous_note_text("u1", {"id": "x", "all_day": True, "start": "2026-10-09"})) is None)
+
 fails = [r for r in results if not r[1]]
 print(f"\n{len(results) - len(fails)} PASS / {len(fails)} FAIL")
 sys.exit(1 if fails else 0)
