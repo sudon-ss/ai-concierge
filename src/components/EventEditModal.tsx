@@ -11,6 +11,8 @@ interface Props {
   errorText?: string | null
   /** 実カレンダー連携時は、登録先カレンダーの切替に対応していないため選択を無効化する */
   lockCalendar?: boolean
+  /** この予定に会議メモがあるとき、メモだけを削除する（自動では消えないため、利用者が個別に削除する） */
+  onDeleteNote?: () => void
 }
 
 const toLocalInputValue = (iso: string): string => {
@@ -23,7 +25,7 @@ const fromLocalInputValue = (value: string): string => {
   return new Date(value).toISOString()
 }
 
-export function EventEditModal({ event, onClose, onSave, onDelete, errorText, lockCalendar }: Props) {
+export function EventEditModal({ event, onClose, onSave, onDelete, errorText, lockCalendar, onDeleteNote }: Props) {
   const [title, setTitle] = useState(event.title)
   const [location, setLocation] = useState(event.location ?? '')
   const [memo, setMemo] = useState(event.memo ?? '')
@@ -50,6 +52,12 @@ export function EventEditModal({ event, onClose, onSave, onDelete, errorText, lo
       source,
       memoFlagged: flagged,
     })
+  }
+
+  const confirmDeleteNote = () => {
+    if (window.confirm('この予定のメモを削除してもよろしいでしょうか？（予定そのものは削除されません）')) {
+      onDeleteNote?.()
+    }
   }
 
   const confirmDelete = () => {
@@ -162,12 +170,26 @@ export function EventEditModal({ event, onClose, onSave, onDelete, errorText, lo
               <textarea
                 value={memo}
                 onChange={(e) => setMemo(e.target.value)}
-                placeholder="ご持参物・ご留意事項など"
-                rows={2}
+                placeholder="会議の内容・決まったこと・ご持参物など"
+                rows={lockCalendar ? 5 : 2}
                 className="flex-1 text-sm focus:outline-none resize-none"
               />
             </div>
+            {lockCalendar && (
+              <p className="mt-1 text-[11px] text-navy-400">
+                メモはこの予定に紐付いて残ります。チャットで「前回の◯◯どうだった？」と聞くと探せます。
+              </p>
+            )}
           </label>
+          {onDeleteNote && (
+            <button
+              type="button"
+              onClick={confirmDeleteNote}
+              className="text-xs text-red-500 hover:text-red-700 underline underline-offset-2 -mt-2"
+            >
+              このメモを削除する
+            </button>
+          )}
 
           <label className="flex items-center gap-2">
             <input

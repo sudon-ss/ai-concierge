@@ -156,12 +156,16 @@ function EventBlock({
     >
       {isShort ? (
         <div className={clsx('font-medium truncate', dense ? 'text-[9px]' : 'text-[10px]')}>
-          <span className="opacity-70 tabular-nums">{fmtT(start)}</span> {event.title}
+          <span className="opacity-70 tabular-nums">{fmtT(start)}</span> {event.noteId && '📝'}
+          {event.title}
         </div>
       ) : (
         <>
           {!dense && <div className="text-[9px] opacity-70 tabular-nums">{fmtT(start)}</div>}
-          <div className={clsx('font-medium truncate', dense ? 'text-[9px]' : 'text-[11px]')}>{event.title}</div>
+          <div className={clsx('font-medium truncate', dense ? 'text-[9px]' : 'text-[11px]')}>
+            {event.noteId && '📝'}
+            {event.title}
+          </div>
         </>
       )}
     </button>
@@ -412,6 +416,7 @@ export function CalendarGridView({ mode, currentDate, events, loading, onDateCha
                         className={clsx('w-1.5 h-1.5 rounded-full', SOURCE_DOT[eventSourceKey(e)])}
                       />
                     ))}
+                    {dayEvents.some((e) => e.noteId) && <span className="text-[9px] leading-none">📝</span>}
                     {dayEvents.length > 4 && (
                       <span className="text-[9px] text-navy-400 leading-none">+{dayEvents.length - 4}</span>
                     )}

@@ -272,6 +272,12 @@ export interface ApiEvent {
   source: 'google' | 'outlook' | 'both'
   /** 削除時にどのカレンダーへ問い合わせるかの判別用（仮押さえの解除で使う） */
   calendar_id?: string | null
+  /** 繰り返し予定（定例会など）のシリーズID */
+  series_id?: string | null
+  /** 同じ会議が複数カレンダーにある場合の、各コピーの識別情報 */
+  copies?: { id: string; calendar_id?: string | null; source: 'google' | 'outlook' }[]
+  /** 会議メモ（あれば）。本文は長いため要約だけ。全文は getNote で取得する */
+  note?: { id: string; priority: 'normal' | 'high' | 'critical'; flagged: boolean; snippet: string }
 }
 
 /** 作成直後の予定。単一カレンダーへの登録結果なので source は必ず片方に定まる */
@@ -297,6 +303,53 @@ export const toDateStr = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 
 export function listEventsRange(start: Date, end: Date): Promise<ApiEvent[]> {
   const qs = `start=${toDateStr(start)}&end=${toDateStr(end)}`
   return cachedGet<ApiEvent[]>(`range.${toDateStr(start)}_${toDateStr(end)}`, `/api/events/range?${qs}`)
+}
+
+// ---- 会議メモ（予定に紐付くメモ）----
+export interface ApiNote {
+  id: string
+  title: string
+  start: string
+  end?: string | null
+  priority: 'normal' | 'high' | 'critical'
+  flagged: boolean
+  series_key?: string | null
+  updated_at?: string
+  body: string
+}
+
+export interface SaveNoteInput {
+  refs: string[]
+  title: string
+  start: string
+  end?: string
+  series_key?: string | null
+  body: string
+  flagged?: boolean
+  use_ai?: boolean
+}
+
+/** 予定にメモを保存する（既にあれば更新）。本文が空で重要マークも無ければ、メモは削除される */
+export function saveNote(input: SaveNoteInput) {
+  return apiFetch<ApiNote | { deleted: true }>('/api/notes', { method: 'PUT', body: JSON.stringify(input) })
+}
+
+export function getNote(id: string) {
+  return apiFetch<ApiNote>(`/api/notes/${id}`)
+}
+
+export function deleteNoteApi(id: string) {
+  return apiFetch<{ ok: boolean }>(`/api/notes/${id}`, { method: 'DELETE' })
+}
+
+/** メモをキーワード・期間（YYYY-MM-DD）で探す。新しい予定のメモから順に返る */
+export function searchNotes(params: { q?: string; start?: string; end?: string }) {
+  const qs = new URLSearchParams()
+  if (params.q) qs.set('q', params.q)
+  if (params.start) qs.set('start', params.start)
+  if (params.end) qs.set('end', params.end)
+  // 検索結果の body は、一覧表示用に要約されている（全文は getNote で取得する）
+  return apiFetch<ApiNote[]>(`/api/notes/search?${qs.toString()}`)
 }
 
 export function getBriefing(): Promise<BriefingResponse> {

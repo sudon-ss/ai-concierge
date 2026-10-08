@@ -11,6 +11,7 @@ from .calendar_service import (
     get_write_adapters,
     normalize_instant,
 )
+from . import notes as notes_svc
 from .database import get_supabase
 
 IMPORTANT_KEYWORDS = ["持っていく", "準備", "印刷", "届ける", "提出", "用意", "締め切り", "締切"]
@@ -444,6 +445,94 @@ async def _adapters_for_copies(user_id: str, copies: list[dict]) -> dict[str, ob
     return adapters
 
 
+NOTE_SEARCH_PAST_DAYS = 120  # 会議のあとにメモを残す／過去の会議にメモを足すときに、予定を探す範囲
+
+
+async def _find_event_for_note(user_id: str, event_id: str) -> dict:
+    """メモを付ける予定を1件特定する。会議が終わった後に付けることが多いため、
+    変更・削除（_find_target_event）と違い、過去の予定も探す。"""
+    now = datetime.now().astimezone()
+    events = await _load_events(
+        user_id, now - timedelta(days=NOTE_SEARCH_PAST_DAYS), now + timedelta(days=RESCHEDULE_SEARCH_DAYS)
+    )
+    target = next(
+        (e for e in events if e["id"] == event_id or any(c["id"] == event_id for c in e.get("copies", []))),
+        None,
+    )
+    if target is None:
+        raise ValueError("対象の予定が見つかりませんでした。find_eventsで予定を確認してください")
+    return target
+
+
+async def save_note(user_id: str, *, event_id: str, text: str, mode: str = "append") -> dict:
+    """予定に会議メモを保存する。既にメモがあれば、既定では追記する（mode=replaceで置き換え）。
+    保存するときに、重要度を1回だけ判定する。"""
+    target = await _find_event_for_note(user_id, event_id)
+    refs = notes_svc.refs_for_event(target)
+    try:
+        existing = await asyncio.to_thread(notes_svc.find_note_by_refs, user_id, refs)
+        body = text.strip()
+        if existing and mode != "replace":
+            body = (existing["body"].rstrip() + "\n" + body).strip()
+        priority = await notes_svc.judge_importance(body)
+        note = await asyncio.to_thread(
+            notes_svc.upsert_note,
+            user_id,
+            refs=refs,
+            title=target["title"],
+            start=target["start"],
+            end=target.get("end"),
+            series_key=target.get("series_id"),
+            body=body,
+            priority=priority,
+            flagged=None,
+        )
+    except notes_svc.NotesUnavailable:
+        raise ValueError("メモ機能は準備中のため、保存できません") from None
+    return {
+        "saved": True,
+        "event": {"title": target["title"], "start": target["start"]},
+        "note": notes_svc.to_public(note) if note else None,
+    }
+
+
+async def search_notes(
+    user_id: str,
+    *,
+    query: str | None = None,
+    title: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    limit: int = 5,
+) -> dict:
+    """過去の会議メモを探す。新しい会議のメモから順に返す。"""
+    try:
+        rows = await asyncio.to_thread(
+            notes_svc.search_notes,
+            user_id,
+            query=query,
+            title=title,
+            date_from=date_from,
+            date_to=date_to,
+            limit=max(1, min(limit, 10)),
+        )
+    except notes_svc.NotesUnavailable:
+        raise ValueError("メモ機能は準備中のため、検索できません") from None
+    return {
+        "count": len(rows),
+        "notes": [
+            {
+                "title": r["event_title"],
+                "start": r["event_start"],
+                "priority": r["priority"],
+                "flagged": r["flagged"],
+                "body": r["body"][:800],
+            }
+            for r in rows
+        ],
+    }
+
+
 async def reschedule_event(
     user_id: str, *, calendar: str, event_id: str, new_start: str, new_end: str
 ) -> dict:
@@ -823,6 +912,42 @@ TOOLS = [
         },
     },
     {
+        "name": "search_notes",
+        "description": (
+            "過去の会議メモを探す。「前回の〇〇の定例、どうだった？」「△△の件、何て話したっけ」"
+            "「先週の会議のメモ」のような質問に使う。新しい会議のメモから順に返す。"
+            "「前回」を聞かれたら、titleに会議名を入れ、date_toに現在日時を指定して、直近のメモを見ること"
+            "（今日これから行う会議のメモを前回として扱わないため）。読み取りのみなので確認は不要。"
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "メモの内容や件名に含まれる言葉（空白区切りで、すべてを含むものを返す）"},
+                "title": {"type": "string", "description": "会議名（部分一致。例: 清原さん定例会）"},
+                "date_from": {"type": "string", "description": "この日時以降の会議（ISO8601、タイムゾーンのオフセット付き）"},
+                "date_to": {"type": "string", "description": "この日時以前の会議（ISO8601、タイムゾーンのオフセット付き）"},
+                "limit": {"type": "integer", "description": "返す件数（既定5・最大10）"},
+            },
+        },
+    },
+    {
+        "name": "save_note",
+        "description": (
+            "予定に会議メモを保存する。ユーザーが「メモして」「メモを残して」と明示したときに使う。"
+            "event_idはfind_eventsで取得すること（過去の会議も探せる）。既にメモがあれば追記する。"
+            "保存したら、保存した内容と対象の会議名・日時を伝えること。"
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "event_id": {"type": "string", "description": "find_eventsで取得したevent_id"},
+                "text": {"type": "string", "description": "保存するメモの本文"},
+                "mode": {"type": "string", "enum": ["append", "replace"], "description": "append=追記（既定）／replace=置き換え"},
+            },
+            "required": ["event_id", "text"],
+        },
+    },
+    {
         "name": "judge_memo_importance",
         "description": "メモ本文から重要度を判定する（持参物・締め切りなどのキーワードを検出）。",
         "input_schema": {
@@ -853,6 +978,10 @@ async def run_tool(name: str, user_id: str, tool_input: dict) -> dict:
         return await create_task(user_id, **tool_input)
     if name == "list_tasks":
         return await list_tasks(user_id, **tool_input)
+    if name == "search_notes":
+        return await search_notes(user_id, **tool_input)
+    if name == "save_note":
+        return await save_note(user_id, **tool_input)
     if name == "judge_memo_importance":
         return judge_memo_importance(tool_input["text"])
     raise ValueError(f"unknown tool: {name}")

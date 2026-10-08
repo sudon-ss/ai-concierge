@@ -64,6 +64,30 @@ create table calendar_connection_state (
   primary key (user_id, provider)
 );
 
+-- event_notes: 会議メモ（カレンダーの予定に紐付くメモ）。1つの予定に1つのメモ。予定の識別情報（event_refs）で
+-- 紐付けるため、日時を変更してもメモは付いてくる。自動では削除しない（利用者が個別に削除する）
+create table event_notes (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references users(id) on delete cascade,
+  event_refs text[] not null default '{}',   -- "google:<予定ID>" "outlook:<予定ID>"
+  series_key text,                           -- 繰り返し予定のシリーズID（Google recurringEventId / Outlook seriesMasterId）
+  event_title text not null,
+  title_key text not null,                   -- 件名の正規化（同名の会議をつなぐ用）
+  event_start timestamptz not null,
+  event_end timestamptz,
+  body text not null default '',
+  priority text not null default 'normal' check (priority in ('normal', 'high', 'critical')),
+  flagged boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index event_notes_user_start_idx on event_notes (user_id, event_start desc);
+create index event_notes_user_series_idx on event_notes (user_id, series_key);
+create index event_notes_user_title_idx on event_notes (user_id, title_key);
+create index event_notes_refs_idx on event_notes using gin (event_refs);
+alter table event_notes enable row level security;
+create policy "own rows only" on event_notes for all using (auth.uid() = user_id);
+
 -- push_subscriptions: Web Push の宛先。1ユーザーが複数端末を持つ想定で複数行を許す
 create table push_subscriptions (
   id uuid primary key default gen_random_uuid(),
